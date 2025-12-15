@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme {
+  --color-legacy-primary: #3b82f6;
+  --color-legacy-bg: #eff6ff;
+  --color-legacy-text: #1f2937;
+  --color-legacy-inputBorder: #cbd5e1;
+  --color-legacy-error: #ef4444;
+  --color-legacy-success: #10b981;
+  --color-legacy-focus: #60a5fa;
+  --color-legacy-container: #ffffff;
+}
+
+/* Al definir las variables arriba en @theme, Tailwind v4 crea 
+   automáticamente las clases: 
+   bg-legacy-bg, text-legacy-text, border-legacy-primary, etc.
+*/
+
+body {
+  /* Usamos las variables del tema directamente */
+  background-color: var(--color-legacy-bg);
+  color: var(--color-legacy-text);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
