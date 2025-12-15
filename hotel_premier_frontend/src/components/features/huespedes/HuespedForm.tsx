@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { huespedSchema, HuespedFormData } from "./huespedSchema";
@@ -6,41 +6,69 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { DateInput } from "@/components/ui/DateInput";
-import { TipoDoc } from "@/api/types";
+import { TipoDoc, HuespedDTO } from "@/api/types";
 import { useAlert } from "@/hooks/useAlert";
 
 interface HuespedFormProps {
+  initialData?: HuespedDTO; // Datos para editar
   onSubmit: (data: HuespedFormData) => void;
   onCancel: () => void;
+  onDelete?: () => void; // Solo se pasa si queremos mostrar el botón BORRAR
   isLoading?: boolean;
 }
 
 export const HuespedForm = ({
+  initialData,
   onSubmit,
   onCancel,
+  onDelete,
   isLoading,
 }: HuespedFormProps) => {
   const { showAlert } = useAlert();
+
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors },
   } = useForm<HuespedFormData>({
     resolver: zodResolver(huespedSchema),
     defaultValues: {
       tipo_documento: TipoDoc.DNI,
+      // Si hay initialData, los valores se sobreescriben en el useEffect
     },
   });
 
-  // Manejo del botón Cancelar con alerta (Wireframe 9e)
+  // Cargar datos iniciales si es edición
+  useEffect(() => {
+    if (initialData) {
+      reset({
+        nombre: initialData.nombre,
+        apellido: initialData.apellido,
+        tipo_documento: initialData.tipoDocumento as TipoDoc,
+        nroDocumento: initialData.documento,
+        // Mapeo de campos opcionales o flat
+        fechaDeNacimiento: initialData.fechaNacimiento || "",
+        email: initialData.email || "",
+        telefono: initialData.telefono,
+        ocupacion: "empleado", // Mock: faltaría este dato en el DTO o backend
+        nacionalidad: "argentina", // Mock
+        direccion: initialData.calle || "",
+        posicionIVA: "CF", // Mock
+        cuit: "",
+      });
+    }
+  }, [initialData, reset]);
+
   const handleCancelClick = async () => {
+    const action = initialData ? "modificación" : "alta";
     const result = await showAlert({
-      title: "¿Desea cancelar el alta del huésped?", // Texto exacto foto 9e
+      title: `¿Desea cancelar la ${action} del huésped?`,
       icon: "question",
       showCancelButton: true,
       confirmButtonText: "SI",
       cancelButtonText: "NO",
-      reverseButtons: true, // Para que SI quede a la derecha
+      reverseButtons: true,
     });
 
     if (result.isConfirmed) {
@@ -48,12 +76,15 @@ export const HuespedForm = ({
     }
   };
 
+  const handleDeleteClick = async () => {
+    if (onDelete) onDelete();
+  };
+
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
       className="animate-in fade-in slide-in-from-bottom-2"
     >
-      {/* Contenedor Principal con Grid de 2 Columnas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 mb-8 p-1">
         {/* Columna Izquierda */}
         <div className="space-y-6">
@@ -61,21 +92,16 @@ export const HuespedForm = ({
             label="Nombres:"
             {...register("nombre")}
             error={errors.nombre?.message}
-            placeholder="Ingrese sus nombres"
           />
-
           <Select
             label="Tipo de documento:"
             options={[
               { label: "DNI", value: TipoDoc.DNI },
               { label: "Pasaporte", value: TipoDoc.PASAPORTE },
-              { label: "Lib. Cívica", value: TipoDoc.LC },
-              { label: "Otro", value: TipoDoc.OTRO },
             ]}
             {...register("tipo_documento")}
             error={errors.tipo_documento?.message}
           />
-
           <Select
             label="Posición frente al IVA:"
             options={[
@@ -86,32 +112,26 @@ export const HuespedForm = ({
             {...register("posicionIVA")}
             error={errors.posicionIVA?.message}
           />
-
           <DateInput
             label="Fecha de nacimiento:"
             {...register("fechaDeNacimiento")}
             error={errors.fechaDeNacimiento?.message}
           />
-
           <Select
             label="Ocupación:"
             options={[
               { label: "Empleado", value: "empleado" },
               { label: "Independiente", value: "independiente" },
-              { label: "Estudiante", value: "estudiante" },
               { label: "Jubilado", value: "jubilado" },
             ]}
             {...register("ocupacion")}
             error={errors.ocupacion?.message}
           />
-
           <Select
             label="Nacionalidad:"
             options={[
               { label: "Argentina", value: "argentina" },
               { label: "Brasil", value: "brasil" },
-              { label: "Uruguay", value: "uruguay" },
-              { label: "Otro", value: "otro" },
             ]}
             {...register("nacionalidad")}
             error={errors.nacionalidad?.message}
@@ -124,62 +144,66 @@ export const HuespedForm = ({
             label="Apellido:"
             {...register("apellido")}
             error={errors.apellido?.message}
-            placeholder="Ingrese su apellido"
           />
-
           <Input
             label="Nro. de documento:"
             {...register("nroDocumento")}
             error={errors.nroDocumento?.message}
-            placeholder="Ingrese número"
           />
-
           <Input
             label="CUIT:"
             {...register("cuit")}
             error={errors.cuit?.message}
-            placeholder="Ingrese CUIT (Opcional)"
+            placeholder="Opcional"
           />
-
           <Input
             label="Dirección:"
             {...register("direccion")}
             error={errors.direccion?.message}
-            placeholder="Ingrese su dirección"
           />
-
           <Input
             label="Email:"
-            type="email"
             {...register("email")}
             error={errors.email?.message}
-            placeholder="Ingrese su email"
           />
-
           <Input
             label="Teléfono:"
-            type="tel"
             {...register("telefono")}
             error={errors.telefono?.message}
-            placeholder="Ingrese su teléfono"
           />
         </div>
       </div>
 
-      {/* Botonera inferior (Separados como en el wireframe) */}
-      <div className="flex justify-between mt-10 border-t pt-6 border-gray-100">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={handleCancelClick}
-          className="w-32"
-        >
-          Cancelar
-        </Button>
+      {/* Botonera CU10: SIGUIENTE, CANCELAR y BORRAR */}
+      <div className="flex justify-between items-center mt-10 border-t pt-6 border-gray-100">
+        {/* Botón BORRAR (Solo si es edición) */}
+        <div className="w-32">
+          {onDelete && (
+            <Button
+              type="button"
+              variant="danger" // Necesitas asegurarte que "danger" exista en tu componente Button o usar className
+              onClick={handleDeleteClick}
+              className="bg-red-500 hover:bg-red-600 text-white w-full"
+            >
+              Borrar
+            </Button>
+          )}
+        </div>
 
-        <Button type="submit" isLoading={isLoading} className="w-32">
-          Siguiente
-        </Button>
+        <div className="flex gap-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleCancelClick}
+            className="w-32"
+          >
+            Cancelar
+          </Button>
+
+          <Button type="submit" isLoading={isLoading} className="w-32">
+            Siguiente
+          </Button>
+        </div>
       </div>
     </form>
   );

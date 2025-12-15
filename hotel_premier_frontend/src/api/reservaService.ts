@@ -1,5 +1,5 @@
 import { apiClient } from "./apiClient";
-import { DisponibilidadReserva } from "./types";
+import { DisponibilidadReserva, ReservaListadoDTO } from "./types";
 
 export const reservaService = {
   // CU04: Buscar disponibilidad para reservar
@@ -12,7 +12,6 @@ export const reservaService = {
   },
 
   // CU04: Crear Reserva
-  // Nota: El backend usa @RequestParam, por eso usamos postParams
   crear: async (
     tipo: string,
     numero: number,
@@ -25,5 +24,23 @@ export const reservaService = {
       fechaInicio,
       fechaFin,
     });
+  },
+
+  // --- NUEVOS MÉTODOS PARA CU06 (Cancelar) ---
+
+  // Buscar reservas activas por apellido/nombre
+  buscarPorHuesped: async (
+    apellido: string,
+    nombre?: string
+  ): Promise<ReservaListadoDTO[]> => {
+    // Endpoint sugerido: /reservas/por-huesped?apellido=...&nombre=...
+    return await apiClient.get("/reservas/por-huesped", { apellido, nombre });
+  },
+
+  // Cancelar una reserva por ID
+  cancelar: async (idReserva: number) => {
+    // Endpoint sugerido: /reservas/cancelar/{id}
+    // Usamos postParams o delete según tu backend. Asumo POST por seguridad.
+    return await apiClient.postParams(`/reservas/cancelar/${idReserva}`, {});
   },
 };

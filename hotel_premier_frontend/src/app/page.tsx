@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MainContainer } from "@/components/ui/MainContainer";
-import { authService } from "@/api/authService"; // Asegúrate de importar esto si usas logout
+import { authService } from "@/api/authService";
 import { Button } from "@/components/ui/Button";
 
 export default function HomePage() {
@@ -12,11 +12,8 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Verificación de Seguridad (Muy básica por ahora)
     const storedUser = localStorage.getItem("usuario");
-
     if (!storedUser) {
-      // Si no hay usuario, ¡patearlo al login!
       router.push("/login");
     } else {
       setUser(JSON.parse(storedUser));
@@ -24,14 +21,12 @@ export default function HomePage() {
     }
   }, [router]);
 
-  // Evitar parpadeos mientras verificamos
   if (loading) return null;
 
   return (
     <MainContainer title={`Bienvenido, ${user?.nombre || "Usuario"}`}>
-      {/* Tablero de Accesos Rápidos (Dashboard) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {/* Tarjeta: Gestionar Huéspedes */}
+        {/* Gestión de Huéspedes */}
         <div
           onClick={() => router.push("/huespedes/buscar")}
           className="bg-white p-6 rounded-xl border border-legacy-inputBorder shadow-sm hover:shadow-md hover:border-legacy-primary cursor-pointer transition-all group"
@@ -47,7 +42,7 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* Tarjeta: Reservas */}
+        {/* Nueva Reserva */}
         <div
           onClick={() => router.push("/reservas/crear")}
           className="bg-white p-6 rounded-xl border border-legacy-inputBorder shadow-sm hover:shadow-md hover:border-legacy-primary cursor-pointer transition-all group"
@@ -63,7 +58,23 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* Tarjeta: Estado Hotel */}
+        {/* Cancelar Reserva (NUEVO) */}
+        <div
+          onClick={() => router.push("/reservas/cancelar")}
+          className="bg-white p-6 rounded-xl border border-legacy-inputBorder shadow-sm hover:shadow-md hover:border-red-500 cursor-pointer transition-all group"
+        >
+          <div className="h-12 w-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            ✕
+          </div>
+          <h3 className="font-bold text-lg text-legacy-text mb-2">
+            Cancelar Reserva
+          </h3>
+          <p className="text-sm text-gray-500">
+            Buscar reservas por huésped y cancelarlas.
+          </p>
+        </div>
+
+        {/* Estado Hotel */}
         <div
           onClick={() => router.push("/habitaciones/estado")}
           className="bg-white p-6 rounded-xl border border-legacy-inputBorder shadow-sm hover:shadow-md hover:border-legacy-primary cursor-pointer transition-all group"
@@ -78,18 +89,23 @@ export default function HomePage() {
             Ver grilla de ocupación y mantenimiento.
           </p>
         </div>
-
-        {/* Tarjeta: Facturación (Futuro) */}
-        <div className="bg-gray-50 p-6 rounded-xl border border-dashed border-gray-300 opacity-60 cursor-not-allowed">
-          <div className="h-12 w-12 bg-gray-200 text-gray-400 rounded-full flex items-center justify-center mb-4">
+        {/* Tarjeta: Facturación (CU07) */}
+        <div
+          onClick={() => router.push("/facturacion")}
+          className="bg-white p-6 rounded-xl border border-legacy-inputBorder shadow-sm hover:shadow-md hover:border-legacy-primary cursor-pointer transition-all group"
+        >
+          <div className="h-12 w-12 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
             💰
           </div>
-          <h3 className="font-bold text-lg text-gray-400 mb-2">Facturación</h3>
-          <p className="text-sm text-gray-400">Próximamente...</p>
+          <h3 className="font-bold text-lg text-legacy-text mb-2">
+            Facturación
+          </h3>
+          <p className="text-sm text-gray-500">
+            Check-out y generación de comprobantes.
+          </p>
         </div>
       </div>
 
-      {/* Botón de Salir rápido */}
       <div className="mt-12 flex justify-end">
         <Button
           variant="secondary"
