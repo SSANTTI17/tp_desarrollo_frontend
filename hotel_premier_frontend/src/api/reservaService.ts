@@ -2,45 +2,27 @@ import { apiClient } from "./apiClient";
 import { DisponibilidadReserva, ReservaListadoDTO } from "./types";
 
 export const reservaService = {
-  // CU04: Buscar disponibilidad para reservar
+  // CU04: Buscar disponibilidad (Grilla)
   buscarDisponibilidad: async (
     tipo: string,
     desde: string,
     hasta: string
   ): Promise<DisponibilidadReserva[]> => {
+    // El back devuelve List<Map<String, Object>> con claves "fecha", "sd1", "sd2"
     return await apiClient.get("/reservas/buscar", { tipo, desde, hasta });
   },
 
-  // CU04: Crear Reserva
-  crear: async (
-    tipo: string,
-    numero: number,
-    fechaInicio: string,
-    fechaFin: string
-  ): Promise<string> => {
-    return await apiClient.postParams("/reservas/crear", {
-      tipo,
-      numero,
-      fechaInicio,
-      fechaFin,
-    });
-  },
-
-  // --- NUEVOS MÉTODOS PARA CU06 (Cancelar) ---
-
-  // Buscar reservas activas por apellido/nombre
+  // CU06: Buscar Reservas por Apellido (Para Cancelar)
   buscarPorHuesped: async (
     apellido: string,
     nombre?: string
-  ): Promise<ReservaListadoDTO[]> => {
-    // Endpoint sugerido: /reservas/por-huesped?apellido=...&nombre=...
+  ): Promise<any[]> => {
+    // Usamos any[] porque el back devuelve Entidad Reserva completa
     return await apiClient.get("/reservas/por-huesped", { apellido, nombre });
   },
 
-  // Cancelar una reserva por ID
+  // CU06: Cancelar Reserva
   cancelar: async (idReserva: number) => {
-    // Endpoint sugerido: /reservas/cancelar/{id}
-    // Usamos postParams o delete según tu backend. Asumo POST por seguridad.
-    return await apiClient.postParams(`/reservas/cancelar/${idReserva}`, {});
+    return await apiClient.delete(`/reservas/cancelar/${idReserva}`, {});
   },
 };

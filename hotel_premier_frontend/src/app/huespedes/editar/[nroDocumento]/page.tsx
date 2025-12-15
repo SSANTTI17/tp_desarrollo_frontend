@@ -85,42 +85,53 @@ export default function EditarHuespedPage() {
 
   // CU11: Dar Baja (Botón BORRAR)
   const handleDelete = async () => {
-    try {
-      // 1. Verificar historial (Mock)
-      // await huespedService.verificarBaja(nroDocumento);
+    if (!huesped) return;
 
-      // Simulación: Si se llama Messi no se puede borrar (Caso 2.A del PDF)
-      if (huesped?.apellido === "Messi") {
+    try {
+      // 1. Llamamos al backend para verificar si se puede eliminar
+      // El controlador verifica si el huésped "isAlojado()"
+      const verificacion = await huespedService.verificarBaja(
+        huesped.documento,
+        huesped.tipoDocumento.toString()
+      );
+
+      // 2. CASO A: No se puede eliminar (Ya tuvo estadías)
+      if (!verificacion.puedeEliminar) {
         await showAlert({
           title: "No se puede eliminar",
-          text: "El huésped no puede ser eliminado pues se ha alojado en el Hotel en alguna oportunidad.",
+          text: verificacion.mensaje, // Mensaje exacto del backend (wireframe 11b)
           icon: "error",
           confirmButtonText: "CONTINUAR",
         });
         return;
       }
 
-      // Caso Exitoso (Paso 2 del PDF - Nunca se alojó)
+      // 3. CASO B: Se puede eliminar (Nunca se alojó)
+      // Mostramos la alerta de confirmación con el mensaje del backend (wireframe 11a)
       const result = await showAlert({
         title: "Confirmar eliminación",
-        html: `Los datos del huésped <b>${huesped?.apellido}, ${huesped?.nombre}</b> serán eliminados del sistema.`,
+        text: verificacion.mensaje,
         icon: "warning",
         showCancelButton: true,
         confirmButtonText: "ELIMINAR",
         cancelButtonText: "CANCELAR",
         confirmButtonColor: "#ef4444",
+        reverseButtons: true,
       });
 
+      // 4. Ejecución de la baja
       if (result.isConfirmed) {
-        await huespedService.eliminar(nroDocumento);
-        await showSuccess(
-          "Eliminado",
-          "Los datos han sido eliminados del sistema."
+        const respuesta = await huespedService.eliminar(
+          huesped.documento,
+          huesped.tipoDocumento.toString()
         );
+
+        // 5. Mensaje de éxito final (wireframe 11c)
+        await showSuccess("Eliminado", respuesta.mensaje);
         router.push("/huespedes/buscar");
       }
-    } catch (error) {
-      showError("Error al intentar eliminar");
+    } catch (error: any) {
+      showError(error.message || "Error al intentar eliminar el huésped");
     }
   };
 
