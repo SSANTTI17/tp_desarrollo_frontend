@@ -1,228 +1,105 @@
 "use client";
 
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MainContainer } from "@/components/ui/MainContainer";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import { authService } from "@/api/authService"; // Asegúrate de importar esto si usas logout
 import { Button } from "@/components/ui/Button";
-import { HuespedList } from "@/components/features/huespedes/HuespedList";
-import { huespedService } from "@/api/huespedService";
-import { useAlert } from "@/hooks/useAlert";
-import { HuespedDTO, TipoDoc } from "@/api/types";
-import { DateInput } from "@/components/ui/DateInput";
-import { TableButton } from "@/components/ui/TableButton";
-import { HourInput } from "@/components/ui/HourInput";
-import { Tabs } from "@/components/ui/Tabs";
 
-export default function BuscarHuespedPage() {
+export default function HomePage() {
   const router = useRouter();
-  const { showError, showSuccess } = useAlert();
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Estado del formulario
-  const [filters, setFilters] = useState({
-    nombre: "",
-    apellido: "",
-    tipoDocumento: "" as TipoDoc | "",
-    documento: "",
-  });
+  useEffect(() => {
+    // 1. Verificación de Seguridad (Muy básica por ahora)
+    const storedUser = localStorage.getItem("usuario");
 
-  // Estado de resultados
-  const [resultados, setResultados] = useState<HuespedDTO[]>([]);
-  const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  // Manejadores
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
-  };
-
-  const handleSearch = async () => {
-    setLoading(true);
-    setSelectedDoc(null);
-
-    // --- MODO PRUEBA: DATOS FALSOS ---
-    // Simulamos una demora de 0.5 seg para ver el loading
-    setTimeout(() => {
-      setResultados([
-        {
-          nombre: "Lionel",
-          apellido: "Messi",
-          tipo_documento: TipoDoc.DNI,
-          nroDocumento: "10101010",
-          telefono: "555-1234",
-          email: "lio@campeon.com",
-          fechaDeNacimiento: "",
-          nacionalidad: "",
-          ocupacion: "",
-          alojado: false,
-          direccion: "",
-        },
-        {
-          nombre: "Julián",
-          apellido: "Álvarez",
-          tipo_documento: TipoDoc.PASAPORTE,
-          nroDocumento: "20202020",
-          telefono: "555-9999",
-          fechaDeNacimiento: "",
-          nacionalidad: "",
-          email: "",
-          ocupacion: "",
-          alojado: false,
-          direccion: "",
-        },
-        {
-          nombre: "Emiliano",
-          apellido: "Martínez",
-          tipo_documento: TipoDoc.DNI,
-          nroDocumento: "30303030",
-          telefono: "555-5555",
-          fechaDeNacimiento: "",
-          nacionalidad: "",
-          email: "",
-          ocupacion: "",
-          alojado: false,
-          direccion: "",
-        },
-      ]);
-      setLoading(false);
-    }, 500);
-
-    // // Validación mínima: al menos un campo lleno
-    // if (
-    //   !filters.nombre &&
-    //   !filters.apellido &&
-    //   !filters.tipoDocumento &&
-    //   !filters.documento
-    // ) {
-    //   // Lógica del legado: Si está vacío y busca, sugiere ir al Alta
-    //   router.push("/huespedes/alta");
-    //   return;
-    // }
-
-    // setLoading(true);
-    // setSelectedDoc(null); // Limpiar selección previa
-    // try {
-    //   const data = await huespedService.buscar({
-    //     nombre: filters.nombre || undefined,
-    //     apellido: filters.apellido || undefined,
-    //     tipoDocumento: filters.tipoDocumento || undefined,
-    //     documento: filters.documento || undefined,
-    //   });
-
-    //   if (data.length === 0) {
-    //     showError("No se encontró el huésped. Redirigiendo a registro...").then(
-    //       () => router.push("/huespedes/alta")
-    //     );
-    //   } else {
-    //     setResultados(data);
-    //   }
-    // } catch (error: any) {
-    //   showError(error.message || "Error al conectar con el servidor");
-    // } finally {
-    //   setLoading(false);
-    // }
-  };
-
-  const handleNext = () => {
-    if (!selectedDoc) {
-      // Si no hay selección, redirige a Alta (comportamiento del legado)
-      router.push("/huespedes/alta");
+    if (!storedUser) {
+      // Si no hay usuario, ¡patearlo al login!
+      router.push("/login");
     } else {
-      // Aquí iría la lógica de Modificar (CU10) o Seleccionar para otro proceso
-      showSuccess("Huésped Seleccionado", `Documento: ${selectedDoc}`).then(
-        () => {
-          // TODO: Implementar navegación a Modificar o Retornar selección
-          console.log("Navegar con huésped: ", selectedDoc);
-        }
-      );
+      setUser(JSON.parse(storedUser));
+      setLoading(false);
     }
-  };
+  }, [router]);
+
+  // Evitar parpadeos mientras verificamos
+  if (loading) return null;
 
   return (
-    <MainContainer title="Titulo">
-      {/* Formulario de Búsqueda */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6 mb-8">
-        <Input
-          label="Nombre:"
-          name="nombre"
-          value={filters.nombre}
-          onChange={handleChange}
-          placeholder="Ingrese nombre"
-        />
-        <Input
-          label="Apellido:"
-          name="apellido"
-          value={filters.apellido}
-          onChange={handleChange}
-          placeholder="Ingrese apellido"
-        />
-        <Select
-          label="Tipo Documento:"
-          name="tipoDocumento"
-          value={filters.tipoDocumento}
-          onChange={handleChange}
-          options={[
-            { label: "DNI", value: TipoDoc.DNI },
-            { label: "LE", value: TipoDoc.LE },
-            { label: "LC", value: TipoDoc.LC },
-            { label: "Pasaporte", value: TipoDoc.PASAPORTE },
-            { label: "Otro", value: TipoDoc.OTRO },
-          ]}
-        />
-        <Input
-          label="N° de Documento:"
-          name="documento"
-          type="number"
-          value={filters.documento}
-          onChange={handleChange}
-          placeholder="Ingrese documento"
-        />
-      </div>
-
-      <div className="flex justify-end mb-6">
-        <Button onClick={handleSearch} isLoading={loading}>
-          Buscar
-        </Button>
-      </div>
-
-      {/* Tabla de Resultados */}
-      <HuespedList
-        huespedes={resultados}
-        selectedDoc={selectedDoc}
-        onSelect={setSelectedDoc}
-      />
-
-      {/* Botón Siguiente (solo aparece si hubo búsqueda exitosa, según diseño, o siempre visible al final) */}
-      {resultados.length > 0 && (
-        <div className="flex justify-end mt-6">
-          <Button variant="secondary" onClick={handleNext}>
-            Siguiente
-          </Button>
+    <MainContainer title={`Bienvenido, ${user?.nombre || "Usuario"}`}>
+      {/* Tablero de Accesos Rápidos (Dashboard) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* Tarjeta: Gestionar Huéspedes */}
+        <div
+          onClick={() => router.push("/huespedes/buscar")}
+          className="bg-white p-6 rounded-xl border border-legacy-inputBorder shadow-sm hover:shadow-md hover:border-legacy-primary cursor-pointer transition-all group"
+        >
+          <div className="h-12 w-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            👥
+          </div>
+          <h3 className="font-bold text-lg text-legacy-text mb-2">
+            Gestionar Huéspedes
+          </h3>
+          <p className="text-sm text-gray-500">
+            Buscar, dar de alta y editar datos de pasajeros.
+          </p>
         </div>
-      )}
 
-      <div className="flex gap-4">
-        <DateInput label="Fecha" type="date" />
-        <HourInput label="Hora" type="time" />
+        {/* Tarjeta: Reservas */}
+        <div
+          onClick={() => router.push("/reservas/crear")}
+          className="bg-white p-6 rounded-xl border border-legacy-inputBorder shadow-sm hover:shadow-md hover:border-legacy-primary cursor-pointer transition-all group"
+        >
+          <div className="h-12 w-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            📅
+          </div>
+          <h3 className="font-bold text-lg text-legacy-text mb-2">
+            Nueva Reserva
+          </h3>
+          <p className="text-sm text-gray-500">
+            Consultar disponibilidad y crear reservas futuras.
+          </p>
+        </div>
+
+        {/* Tarjeta: Estado Hotel */}
+        <div
+          onClick={() => router.push("/habitaciones/estado")}
+          className="bg-white p-6 rounded-xl border border-legacy-inputBorder shadow-sm hover:shadow-md hover:border-legacy-primary cursor-pointer transition-all group"
+        >
+          <div className="h-12 w-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            hotel
+          </div>
+          <h3 className="font-bold text-lg text-legacy-text mb-2">
+            Estado de Habitaciones
+          </h3>
+          <p className="text-sm text-gray-500">
+            Ver grilla de ocupación y mantenimiento.
+          </p>
+        </div>
+
+        {/* Tarjeta: Facturación (Futuro) */}
+        <div className="bg-gray-50 p-6 rounded-xl border border-dashed border-gray-300 opacity-60 cursor-not-allowed">
+          <div className="h-12 w-12 bg-gray-200 text-gray-400 rounded-full flex items-center justify-center mb-4">
+            💰
+          </div>
+          <h3 className="font-bold text-lg text-gray-400 mb-2">Facturación</h3>
+          <p className="text-sm text-gray-400">Próximamente...</p>
+        </div>
       </div>
-      <div className="mt-4">
-        <TableButton variant="delete">Eliminar</TableButton>
-      </div>
-      <div className="mt-8">
-        <Tabs
-          tabs={[
-            {
-              id: "ind",
-              label: "Individual",
-              content: <p>Contenido de Individual</p>,
-            },
-            { id: "dob", label: "Doble", content: <p>Contenido de Doble</p> },
-            { id: "sui", label: "Suite", content: <p>Contenido de Suite</p> },
-          ]}
-        />
+
+      {/* Botón de Salir rápido */}
+      <div className="mt-12 flex justify-end">
+        <Button
+          variant="secondary"
+          onClick={() => {
+            authService.logout();
+            router.push("/login");
+          }}
+        >
+          Cerrar Sesión
+        </Button>
       </div>
     </MainContainer>
   );

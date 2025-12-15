@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import "./globals.css"; // <--- ESTA LÍNEA ES CRUCIAL
+import "./globals.css";
+import AuthGuard from "@/components/auth/AuthGuard";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Hotel Premier",
-  description: "Sistema de Gestión Hotelera",
+  description: "Sistema de gestión hotelera",
 };
 
 export default function RootLayout({
@@ -16,7 +17,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body className={inter.className}>{children}</body>
+      <body className="antialiased bg-legacy-bg text-legacy-text">
+        {/* Envolvemos todo el contenido con el AuthGuard */}
+        <AuthGuard>{children}</AuthGuard>
+      </body>
     </html>
   );
 }
