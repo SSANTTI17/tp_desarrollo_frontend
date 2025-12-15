@@ -1,14 +1,23 @@
 import React, { useState } from "react";
 import { HabitacionDTO, EstadoHabitacion } from "@/api/types";
 
+export interface GridSelection {
+  habitacion: number;
+  fechas: string[];
+  startIndex: number;
+  endIndex: number;
+}
+
 interface AvailabilityGridProps {
   habitaciones: HabitacionDTO[];
   fechaInicio: string;
   dias: number;
   selectable?: boolean;
-  onSelectionChange?: (
-    seleccion: { habitacion: number; fechas: string[] } | null
-  ) => void;
+  selections?: GridSelection[];
+  onSelectionComplete?: (selection: GridSelection) => void;
+  // NUEVA PROP: Para avisar que se quiere borrar una selección
+  onSelectionRemove?: (selection: GridSelection) => void;
+  onSelectionError?: (mensaje: string) => void;
 }
 
 export const AvailabilityGrid = ({
@@ -16,16 +25,16 @@ export const AvailabilityGrid = ({
   fechaInicio,
   dias,
   selectable = false,
-  onSelectionChange,
+  selections = [],
+  onSelectionComplete,
+  onSelectionRemove,
+  onSelectionError,
 }: AvailabilityGridProps) => {
-  // Estado interno para la selección (Start y End)
-  const [selection, setSelection] = useState<{
+  const [tempSelection, setTempSelection] = useState<{
     room: number;
     startIndex: number;
-    endIndex: number;
   } | null>(null);
 
-  // Generador de fechas (igual que antes)
   const generateDates = () => {
     const dates = [];
     const [year, month, day] = fechaInicio.split("-").map(Number);
@@ -44,97 +53,123 @@ export const AvailabilityGrid = ({
   };
   const fechas = generateDates();
 
-  // Manejo del Clic en Celda
-  const handleCellClick = (
-    roomNumber: number,
-    dateIndex: number,
-    estado: EstadoHabitacion
+  const validateRange = (
+    habitacion: HabitacionDTO,
+    start: number,
+    end: number
   ) => {
-    if (!selectable) return;
-    if (estado !== EstadoHabitacion.DISPONIBLE) return; // No se puede seleccionar ocupado
+    const realStart = Math.min(start, end);
+    const realEnd = Math.max(start, end);
 
-    // Lógica de selección de rango
-    let newSelection = null;
-
-    if (!selection || selection.room !== roomNumber) {
-      // Nueva selección o cambio de habitación -> Inicio del rango
-      newSelection = {
-        room: roomNumber,
-        startIndex: dateIndex,
-        endIndex: dateIndex,
-      };
-    } else {
-      // Misma habitación -> Expandir rango o reiniciar
-      if (dateIndex < selection.startIndex) {
-        // Clic anterior al inicio -> Nuevo inicio
-        newSelection = {
-          room: roomNumber,
-          startIndex: dateIndex,
-          endIndex: selection.endIndex,
-        };
-      } else {
-        // Clic posterior -> Definir fin
-        newSelection = {
-          room: roomNumber,
-          startIndex: selection.startIndex,
-          endIndex: dateIndex,
+    for (let i = realStart; i <= realEnd; i++) {
+      const estado = habitacion.estadosPorDia[i];
+      if (estado && estado !== EstadoHabitacion.DISPONIBLE) {
+        return {
+          valid: false,
+          error: `Conflicto: El día ${fechas[i]} la habitación está ${estado}.`,
         };
       }
     }
-
-    setSelection(newSelection);
-
-    // Notificar al padre
-    if (onSelectionChange && newSelection) {
-      const selectedDates = fechas.slice(
-        newSelection.startIndex,
-        newSelection.endIndex + 1
-      );
-      onSelectionChange({ habitacion: roomNumber, fechas: selectedDates });
-    } else if (onSelectionChange) {
-      onSelectionChange(null);
-    }
+    return { valid: true };
   };
 
-  // Función de Estilos
+  const handleCellClick = (hab: HabitacionDTO, index: number) => {
+    if (!selectable) return;
+
+    // 1. NUEVA LÓGICA: Verificar si se hizo clic en una selección YA CONFIRMADA (Azul)
+    const existingSelection = selections.find(
+      (s) =>
+        s.habitacion === hab.numero &&
+        index >= s.startIndex &&
+        index <= s.endIndex
+    );
+
+    if (existingSelection) {
+      // Si existe, pedimos al padre que la remueva
+      if (onSelectionRemove) {
+        onSelectionRemove(existingSelection);
+        setTempSelection(null); // Cancelamos cualquier selección temporal en curso
+      }
+      return;
+    }
+
+    // 2. Si no es una selección existente, seguimos con la lógica de crear una nueva
+    if (!tempSelection || tempSelection.room !== hab.numero) {
+      if (hab.estadosPorDia[index] !== EstadoHabitacion.DISPONIBLE) {
+        onSelectionError?.(
+          "No puedes iniciar una reserva en una fecha ocupada."
+        );
+        return;
+      }
+      setTempSelection({ room: hab.numero, startIndex: index });
+      return;
+    }
+
+    // 3. Completar rango
+    const validation = validateRange(hab, tempSelection.startIndex, index);
+
+    if (!validation.valid) {
+      onSelectionError?.(validation.error || "Rango inválido");
+      setTempSelection(null);
+      return;
+    }
+
+    const start = Math.min(tempSelection.startIndex, index);
+    const end = Math.max(tempSelection.startIndex, index);
+
+    onSelectionComplete?.({
+      habitacion: hab.numero,
+      fechas: fechas.slice(start, end + 1),
+      startIndex: start,
+      endIndex: end,
+    });
+
+    setTempSelection(null);
+  };
+
   const getCellColor = (
     estado: EstadoHabitacion,
     roomNumber: number,
     index: number
   ) => {
-    // 1. Si está seleccionado (Azul fuerte)
-    if (
-      selection &&
-      selection.room === roomNumber &&
-      index >= selection.startIndex &&
-      index <= selection.endIndex
-    ) {
-      return "bg-legacy-primary text-white border-blue-600 cursor-pointer";
+    // Si está confirmado (Azul)
+    const isConfirmed = selections.some(
+      (s) =>
+        s.habitacion === roomNumber &&
+        index >= s.startIndex &&
+        index <= s.endIndex
+    );
+    // Agregamos hover rojo para indicar que se puede borrar
+    if (isConfirmed)
+      return "bg-blue-600 text-white border-blue-700 hover:bg-red-500 hover:text-white cursor-pointer";
+
+    if (tempSelection && tempSelection.room === roomNumber) {
+      if (index === tempSelection.startIndex)
+        return "bg-blue-400 text-white ring-2 ring-blue-300";
     }
 
-    // 2. Estados normales
     const s = estado?.toString().toUpperCase() || "";
     if (s === "DISPONIBLE")
       return `bg-[#A7D8A6] ${
         selectable ? "cursor-pointer hover:brightness-95" : ""
       }`;
-    if (s === "OCUPADA") return "bg-[#C4C4C4] cursor-not-allowed";
-    if (s === "RESERVADA") return "bg-[#FCA5A5] cursor-not-allowed";
+    if (s === "OCUPADA") return "bg-[#C4C4C4] cursor-not-allowed opacity-80";
+    if (s === "RESERVADA") return "bg-[#FCA5A5] cursor-not-allowed opacity-80";
+    if (s.includes("FUERA")) return "bg-gray-800 cursor-not-allowed";
 
     return "bg-white";
   };
 
-  if (habitaciones.length === 0) {
+  if (habitaciones.length === 0)
     return (
       <div className="p-8 text-center text-gray-500 bg-gray-50 border rounded">
         Sin resultados.
       </div>
     );
-  }
 
   return (
-    <div className="overflow-x-auto border border-legacy-inputBorder rounded-lg shadow-sm">
-      <table className="w-full text-sm text-center border-collapse select-none">
+    <div className="overflow-x-auto border border-legacy-inputBorder rounded-lg shadow-sm select-none">
+      <table className="w-full text-sm text-center border-collapse">
         <thead>
           <tr className="bg-gray-100 text-legacy-text">
             <th className="p-3 border sticky left-0 bg-gray-100 z-10 w-24">
@@ -150,7 +185,7 @@ export const AvailabilityGrid = ({
         <tbody>
           {fechas.map((fechaStr, idx) => (
             <tr key={fechaStr}>
-              <td className="p-2 border bg-gray-50 sticky left-0 z-10 font-medium">
+              <td className="p-2 border bg-gray-50 sticky left-0 z-10 font-medium text-xs">
                 {fechaStr}
               </td>
               {habitaciones.map((hab) => {
@@ -159,12 +194,13 @@ export const AvailabilityGrid = ({
                 return (
                   <td
                     key={`${hab.numero}-${idx}`}
-                    className={`border border-legacy-inputBorder/50 transition-colors ${getCellColor(
+                    className={`border border-legacy-inputBorder/50 transition-all ${getCellColor(
                       estado,
                       hab.numero,
                       idx
                     )}`}
-                    onClick={() => handleCellClick(hab.numero, idx, estado)}
+                    onClick={() => handleCellClick(hab, idx)}
+                    title={`Hab ${hab.numero}: ${estado}`}
                   ></td>
                 );
               })}
