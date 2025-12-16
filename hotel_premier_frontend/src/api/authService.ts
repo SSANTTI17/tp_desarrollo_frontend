@@ -10,27 +10,35 @@ export interface LoginResponse {
 }
 
 export const authService = {
+  // 1. Verificar si existen datos en la tabla CONSERJES
+  verificarExistenciaConserjes: async (): Promise<boolean> => {
+    try {
+      // Hacemos un GET a /conserjes (o el endpoint que liste usuarios)
+      // Si devuelve un array con elementos, retornamos true.
+      const conserjes = await apiClient.get("/conserjes");
+      return Array.isArray(conserjes) && conserjes.length > 0;
+    } catch (error) {
+      // Si el endpoint da 404 o error, asumimos que no hay datos o no se pueden leer
+      // para habilitar el modo admin de rescate/inicio si fuera necesario.
+      // Ojo: Dependerá de tu backend retornar lista vacía [] en lugar de error si no hay nadie.
+      console.warn("No se pudo verificar conserjes:", error);
+      return false;
+    }
+  },
+
+  // 2. Login REAL contra la Base de Datos
   login: async (usuario: string, clave: string): Promise<LoginResponse> => {
-    // AHORA: Llamada real al backend
-    // Nota: Asegurate de que tu backend tenga un controlador que escuche POST /api/auth/login
-    // Si no tienes endpoint de login en Java, esto dará 404.
+    return await apiClient.post("/auth/login", { usuario, clave });
+  },
 
-    // return await apiClient.post("/auth/login", { usuario, clave });
-
-    // --- MANTENEMOS EL MOCK SOLO SI NO TIENES LOGIN EN EL BACKEND ---
-    // (Como en los archivos de backend que subiste NO VI un Controlador de Autenticación,
-    // te dejo esta versión simulada "mejorada" para que no se te rompa el acceso).
-
-    return new Promise((resolve, reject) => {
+  // 3. Login SIMULADO (Solo para el primer acceso 'admin/admin')
+  loginMockAdmin: async (): Promise<LoginResponse> => {
+    return new Promise((resolve) => {
       setTimeout(() => {
-        if (usuario === "admin" && clave === "admin") {
-          resolve({
-            token: "fake-jwt-token-123456",
-            usuario: { id: 1, nombre: "Administrador", rol: "ADMIN" },
-          });
-        } else {
-          reject(new Error("Credenciales inválidas. Intente nuevamente."));
-        }
+        resolve({
+          token: "admin-setup-token-" + Date.now(),
+          usuario: { id: 0, nombre: "Admin Inicial", rol: "ADMIN" },
+        });
       }, 500);
     });
   },

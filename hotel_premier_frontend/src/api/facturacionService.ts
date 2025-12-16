@@ -1,28 +1,35 @@
 import { apiClient } from "./apiClient";
-import { OcupanteDTO, ItemFacturaDTO } from "./types";
+import {
+  HuespedDTO,
+  ContenedorEstadiaYFacturaDTO,
+  GenerarFacturaRequest,
+  ConfirmarFacturaRequest,
+} from "./types";
 
 export const facturacionService = {
-  // Paso 1: Buscar ocupantes (Endpoint Real)
+  // Paso 1: Buscar ocupantes
+  // El back espera parametros: ?habitacion=TIPO+NUM (ej: IE101) & fechaSalida=yyyy-MM-dd
   buscarOcupantes: async (
-    nroHabitacion: string,
-    hora: string
-  ): Promise<OcupanteDTO[]> => {
+    tipo: string,
+    numero: string,
+    fechaSalida: string
+  ): Promise<HuespedDTO[]> => {
+    const habitacionStr = `${tipo}${numero}`;
     return await apiClient.get("/facturacion/ocupantes", {
-      numeroHabitacion: nroHabitacion,
-      horaSalida: hora,
+      habitacion: habitacionStr,
+      fechaSalida: fechaSalida,
     });
   },
 
-  // Paso 2: Traer ítems (Endpoint Real)
-  obtenerItems: async (documento: string): Promise<ItemFacturaDTO[]> => {
-    // El back espera 'documentoOcupante'
-    return await apiClient.get("/facturacion/pendientes", {
-      documentoOcupante: documento,
-    });
+  // Paso 2: Generar (Pre-visualizar la factura y obtener consumos)
+  generar: async (
+    req: GenerarFacturaRequest
+  ): Promise<ContenedorEstadiaYFacturaDTO> => {
+    return await apiClient.post("/facturacion/generar", req);
   },
 
-  // Paso 3: Facturar (Endpoint Real)
-  facturar: async (datos: any) => {
-    return await apiClient.post("/facturacion/generar", datos);
+  // Paso 3: Confirmar (Guardar factura real)
+  confirmar: async (req: ConfirmarFacturaRequest): Promise<any> => {
+    return await apiClient.post("/facturacion/confirmar", req);
   },
 };

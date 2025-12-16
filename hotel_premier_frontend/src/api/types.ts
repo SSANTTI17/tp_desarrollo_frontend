@@ -22,19 +22,15 @@ export enum EstadoHabitacion {
   DISPONIBLE = "Disponible",
 }
 
-// CORREGIDO: Alineado 100% con tu Backend Java (HuespedDTO.java)
 export interface HuespedDTO {
   nombre: string;
   apellido: string;
-  tipo_documento: TipoDoc | string; // Back envía "tipo_documento"
-  nroDocumento: string; // Back envía "nroDocumento"
-  fechaDeNacimiento?: string; // Back envía "fechaDeNacimiento"
+  tipo_documento: TipoDoc | string;
+  nroDocumento: string;
+  fechaDeNacimiento?: string;
   email?: string;
   telefono: string;
-
-  // Dirección es un solo string en tu back actual
   direccion?: string;
-
   ocupacion?: string;
   nacionalidad?: string;
   alojado?: boolean;
@@ -85,20 +81,61 @@ export interface ReservaListadoDTO {
   estado: string;
 }
 
-// Facturación
+// --- NUEVOS DTOS PARA FACTURACIÓN (CU07) ---
+
 export interface OcupanteDTO {
   nombre: string;
   apellido: string;
   nroDocumento: string;
   tipo_documento: string;
-  // Campos opcionales para mapeo interno
-  id?: number;
-  documento?: string;
 }
 
-export interface ItemFacturaDTO {
+export interface ConsumoDTO {
   id: number;
-  fecha: string;
-  consumo: string;
+  tipo: string;
   monto: number;
+  moneda: string;
+  facturado?: boolean;
+}
+
+export interface EstadiaDTO {
+  id?: number;
+  fechaInicio?: string;
+  fechaFin?: string;
+  precio?: number;
+  consumos?: ConsumoDTO[];
+}
+
+export interface FacturaDTO {
+  tipoFactura: string;
+  valorEstadia: number;
+  totalAPagar: number;
+  vuelto: number;
+  pagado: boolean;
+  responsablePago?: any;
+}
+
+export interface ContenedorEstadiaYFacturaDTO {
+  estadia: EstadiaDTO;
+  factura: FacturaDTO;
+}
+
+export interface GenerarFacturaRequest {
+  huesped?: HuespedDTO;
+  cuit?: string;
+  estadia: { fechaFin: string };
+  habitacion: { numero: number; tipo: string };
+}
+
+export interface ConfirmarFacturaRequest {
+  idEstadia: number;
+  factura: any;
+  huesped?: HuespedDTO;
+  responsable?: {
+    CUIT: string;
+    razonSocial?: string;
+    direccion?: string;
+    telefono?: number;
+  }; // Coincide con PersonaJuridicaDTO del back
+  consumos: ConsumoDTO[];
 }

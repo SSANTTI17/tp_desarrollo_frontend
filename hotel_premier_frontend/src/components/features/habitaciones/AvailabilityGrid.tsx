@@ -15,7 +15,6 @@ interface AvailabilityGridProps {
   selectable?: boolean;
   selections?: GridSelection[];
   onSelectionComplete?: (selection: GridSelection) => void;
-  // NUEVA PROP: Para avisar que se quiere borrar una selección
   onSelectionRemove?: (selection: GridSelection) => void;
   onSelectionError?: (mensaje: string) => void;
 }
@@ -44,7 +43,7 @@ export const AvailabilityGrid = ({
         date.toLocaleDateString("es-AR", {
           day: "2-digit",
           month: "2-digit",
-          year: "2-digit",
+          year: "numeric", // Año 4 dígitos (2025)
         })
       );
       date.setDate(date.getDate() + 1);
@@ -76,7 +75,7 @@ export const AvailabilityGrid = ({
   const handleCellClick = (hab: HabitacionDTO, index: number) => {
     if (!selectable) return;
 
-    // 1. NUEVA LÓGICA: Verificar si se hizo clic en una selección YA CONFIRMADA (Azul)
+    // 1. Verificar si se hizo clic en una selección YA CONFIRMADA
     const existingSelection = selections.find(
       (s) =>
         s.habitacion === hab.numero &&
@@ -85,15 +84,14 @@ export const AvailabilityGrid = ({
     );
 
     if (existingSelection) {
-      // Si existe, pedimos al padre que la remueva
       if (onSelectionRemove) {
         onSelectionRemove(existingSelection);
-        setTempSelection(null); // Cancelamos cualquier selección temporal en curso
+        setTempSelection(null);
       }
       return;
     }
 
-    // 2. Si no es una selección existente, seguimos con la lógica de crear una nueva
+    // 2. Iniciar nueva selección
     if (!tempSelection || tempSelection.room !== hab.numero) {
       if (hab.estadosPorDia[index] !== EstadoHabitacion.DISPONIBLE) {
         onSelectionError?.(
@@ -132,14 +130,13 @@ export const AvailabilityGrid = ({
     roomNumber: number,
     index: number
   ) => {
-    // Si está confirmado (Azul)
     const isConfirmed = selections.some(
       (s) =>
         s.habitacion === roomNumber &&
         index >= s.startIndex &&
         index <= s.endIndex
     );
-    // Agregamos hover rojo para indicar que se puede borrar
+
     if (isConfirmed)
       return "bg-blue-600 text-white border-blue-700 hover:bg-red-500 hover:text-white cursor-pointer";
 
@@ -150,11 +147,16 @@ export const AvailabilityGrid = ({
 
     const s = estado?.toString().toUpperCase() || "";
     if (s === "DISPONIBLE")
-      return `bg-[#A7D8A6] ${
+      return `bg-[#AEDD94] ${
         selectable ? "cursor-pointer hover:brightness-95" : ""
       }`;
-    if (s === "OCUPADA") return "bg-[#C4C4C4] cursor-not-allowed opacity-80";
-    if (s === "RESERVADA") return "bg-[#FCA5A5] cursor-not-allowed opacity-80";
+
+    // --- COLORES DE ESTADOS ---
+    if (s === "OCUPADA") return "bg-[#C0C0C0] cursor-not-allowed opacity-80"; // Gris
+
+    // CAMBIO AQUÍ: Usamos Azul Claro para RESERVADA en lugar de Rojo
+    if (s === "RESERVADA") return "bg-[#F4EB49] cursor-not-allowed opacity-80";
+
     if (s.includes("FUERA")) return "bg-gray-800 cursor-not-allowed";
 
     return "bg-white";
