@@ -137,7 +137,7 @@ export default function EditarHuespedPage() {
       <HuespedForm
         initialData={huesped}
         onSubmit={handleUpdate}
-        onCancel={() => router.push("/huespedes/buscar")}
+        onCancel={() => router.push("/")}
         onDelete={handleDelete}
         isLoading={loading}
       />

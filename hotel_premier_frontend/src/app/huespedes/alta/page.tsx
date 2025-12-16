@@ -110,7 +110,7 @@ export default function AltaHuespedPage() {
     <MainContainer title="Alta de Huésped">
       <HuespedForm
         onSubmit={handleCreate}
-        onCancel={() => router.push("/huespedes/buscar")}
+        onCancel={() => router.push("/")}
         isLoading={loading}
       />
     </MainContainer>

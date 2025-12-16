@@ -6,8 +6,8 @@ import { MainContainer } from "@/components/ui/MainContainer";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
-import { HuespedDTO, TipoDocumento } from "@/api/types";
-import { huespedService } from "@/api/huespedService"; // Importamos servicio real
+import { HuespedDTO, TipoDoc } from "@/api/types";
+import { huespedService } from "@/api/huespedService";
 import { useAlert } from "@/hooks/useAlert";
 
 export default function BuscarHuespedPage() {
@@ -26,14 +26,20 @@ export default function BuscarHuespedPage() {
   const [busquedaRealizada, setBusquedaRealizada] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
 
-  // --- LÓGICA DE BÚSQUEDA REAL ---
+  // Helper para validar solo texto (sin números)
+  const handleTextInput = (field: string, value: string) => {
+    // Regex: Solo permite letras (a-z, A-Z) y espacios
+    if (/^[a-zA-Z\s]*$/.test(value)) {
+      setFiltros((prev) => ({ ...prev, [field]: value }));
+    }
+  };
+
   const handleSearch = async () => {
     setLoading(true);
     setBusquedaRealizada(true);
     setSelectedDoc(null);
 
     try {
-      // Llamada real al backend
       const resultados = await huespedService.buscar({
         nombre: filtros.nombre,
         apellido: filtros.apellido,
@@ -52,10 +58,17 @@ export default function BuscarHuespedPage() {
 
   const handleNext = () => {
     if (selectedDoc) {
+      // Si hay un huésped seleccionado, vamos a la pantalla de EDICIÓN
       router.push(`/huespedes/editar/${selectedDoc}`);
     } else {
-      showError("Debe seleccionar un huésped para continuar.");
+      // Si NO hay selección, asumimos que se quiere dar de ALTA uno nuevo
+      router.push("/huespedes/alta");
     }
+  };
+
+  const handleCancel = () => {
+    // Volver al menú principal
+    router.push("/");
   };
 
   return (
@@ -67,15 +80,13 @@ export default function BuscarHuespedPage() {
             label="Nombres:"
             placeholder="Ingrese sus nombres"
             value={filtros.nombre}
-            onChange={(e) => setFiltros({ ...filtros, nombre: e.target.value })}
+            onChange={(e) => handleTextInput("nombre", e.target.value)} // Validación aplicada
           />
           <Input
             label="Apellido:"
             placeholder="Ingrese su apellido"
             value={filtros.apellido}
-            onChange={(e) =>
-              setFiltros({ ...filtros, apellido: e.target.value })
-            }
+            onChange={(e) => handleTextInput("apellido", e.target.value)} // Validación aplicada
           />
           <Select
             label="Tipo de documento:"
@@ -84,10 +95,12 @@ export default function BuscarHuespedPage() {
               setFiltros({ ...filtros, tipoDocumento: e.target.value })
             }
             options={[
-              { label: "DNI", value: "DNI" }, // Ojo: deben coincidir con Enum Back
-              { label: "Pasaporte", value: "PASAPORTE" },
-              { label: "Libreta Cívica", value: "LC" },
-              { label: "Libreta Enrolamiento", value: "LE" },
+              // Lista completa según TipoDoc en types.ts
+              { label: "DNI", value: TipoDoc.DNI },
+              { label: "Libreta Cívica", value: TipoDoc.LC },
+              { label: "Libreta Enrolamiento", value: TipoDoc.LE },
+              { label: "Pasaporte", value: TipoDoc.PASAPORTE },
+              { label: "Otro", value: TipoDoc.OTRO },
             ]}
           />
           <Input
@@ -156,7 +169,7 @@ export default function BuscarHuespedPage() {
               ) : huespedes.length > 0 ? (
                 huespedes.map((h) => (
                   <tr
-                    key={h.nroDocumento} // Usamos nroDocumento como key
+                    key={h.nroDocumento}
                     onClick={() => setSelectedDoc(h.nroDocumento)}
                     className={`cursor-pointer transition-colors ${
                       selectedDoc === h.nroDocumento
@@ -191,12 +204,12 @@ export default function BuscarHuespedPage() {
           </table>
         </div>
 
-        <div className="p-4 border-t border-legacy-inputBorder flex justify-end bg-gray-50">
-          <Button
-            variant={selectedDoc ? "primary" : "secondary"}
-            disabled={!selectedDoc}
-            onClick={handleNext}
-          >
+        <div className="p-4 border-t border-legacy-inputBorder flex justify-between bg-gray-50">
+          <Button variant="secondary" onClick={handleCancel}>
+            Cancelar
+          </Button>
+
+          <Button variant="primary" onClick={handleNext}>
             Siguiente
           </Button>
         </div>

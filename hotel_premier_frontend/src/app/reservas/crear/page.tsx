@@ -12,9 +12,8 @@ import {
 } from "@/components/features/habitaciones/AvailabilityGrid";
 import { useAlert } from "@/hooks/useAlert";
 import { HabitacionDTO, TipoHabitacion, EstadoHabitacion } from "@/api/types";
-import { reservaService } from "@/api/reservaService"; // Importar servicio real
-import { habitacionService } from "@/api/habitacionService"; // Importar servicio real
-import { apiClient } from "@/api/apiClient";
+import { reservaService } from "@/api/reservaService";
+import { apiClient } from "@/api/apiClient"; // Necesario para la llamada mixta (Params + Body)
 
 export default function CrearReservaPage() {
   const router = useRouter();
@@ -24,21 +23,24 @@ export default function CrearReservaPage() {
   const [habitaciones, setHabitaciones] = useState<HabitacionDTO[]>([]);
   const [pendientes, setPendientes] = useState<GridSelection[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Fechas por defecto
   const today = new Date().toISOString().split("T")[0];
+  // Fecha fin calculada para la búsqueda inicial (15 días)
+  const fechaFinCalculada = new Date();
+  fechaFinCalculada.setDate(fechaFinCalculada.getDate() + 15);
+  const fechaFinStr = fechaFinCalculada.toISOString().split("T")[0];
 
   const mostrarResultados = habitaciones.length > 0;
 
-  // Lógica de búsqueda REAL conectada al Backend
+  // Helper para formatear fecha (YYYY-MM-DD a DD/MM/YYYY) para el mensaje de error
+  const formatFecha = (f: string) => f.split("-").reverse().join("/");
+
   const handleSearch = async () => {
     if (!tipoHabitacion) return;
     setLoading(true);
 
     try {
-      // 1. Calculamos fecha fin (ej: 15 días vista)
-      const fechaFin = new Date();
-      fechaFin.setDate(fechaFin.getDate() + 15);
-      const fechaFinStr = fechaFin.toISOString().split("T")[0];
-
       // 2. Llamamos al backend para obtener la disponibilidad
       const disponibilidad = await reservaService.buscarDisponibilidad(
         tipoHabitacion,
@@ -46,44 +48,42 @@ export default function CrearReservaPage() {
         fechaFinStr
       );
 
-      // 3. Transformamos la respuesta del backend (lista plana de fechas)
-      // a la estructura que espera la grilla (HabitacionDTO[])
-      // El backend nos dice si hay disponibilidad (sd1, sd2) para el tipo elegido.
-      // Vamos a simular "Habitaciones" visuales basadas en esa disponibilidad.
-
-      // Creamos objetos DTO para la grilla
+      // 3. Mapeo de respuesta
       const habsMapeadas: HabitacionDTO[] = [];
 
-      // Si el backend dice sd1 (Sub-disponibilidad 1), creamos una fila
       if (disponibilidad.some((d) => d !== undefined)) {
-        // Mapeamos fila 1 (Ej: Habitación X01)
         const estados1 = disponibilidad.map((d) =>
           d.sd1 ? EstadoHabitacion.DISPONIBLE : EstadoHabitacion.OCUPADA
         );
         habsMapeadas.push({
-          numero: 101, // Número ficticio o real según lógica de negocio
+          numero: 101, // Nro ficticio visual
           tipo: tipoHabitacion,
           costoNoche: 0,
           estadosPorDia: estados1,
         });
 
-        // Mapeamos fila 2 (Ej: Habitación X02)
         const estados2 = disponibilidad.map((d) =>
           d.sd2 ? EstadoHabitacion.DISPONIBLE : EstadoHabitacion.OCUPADA
         );
         habsMapeadas.push({
-          numero: 102,
+          numero: 102, // Nro ficticio visual
           tipo: tipoHabitacion,
           costoNoche: 0,
           estadosPorDia: estados2,
         });
       }
 
+      // CORRECCIÓN 1: Mensaje específico si no hay resultados
       if (habsMapeadas.length === 0) {
-        showError("No se encontró información de disponibilidad.");
+        setHabitaciones([]);
+        showError(
+          `No hay habitaciones del tipo ${tipoHabitacion} disponibles para el rango de fechas ${formatFecha(
+            today
+          )} hasta ${formatFecha(fechaFinStr)}`
+        );
+      } else {
+        setHabitaciones(habsMapeadas);
       }
-
-      setHabitaciones(habsMapeadas);
     } catch (error) {
       console.error(error);
       showError("Error al buscar disponibilidad en el servidor.");
@@ -138,9 +138,9 @@ export default function CrearReservaPage() {
     const listaHtml = pendientes
       .map(
         (p) =>
-          `<li class="mb-1"><b>Hab ${p.habitacion}:</b> del ${p.fechas[0]} al ${
-            p.fechas[p.fechas.length - 1]
-          }</li>`
+          `<li class="mb-1"><b>Hab ${p.habitacion}:</b> del ${formatFecha(
+            p.fechas[0]
+          )} al ${formatFecha(p.fechas[p.fechas.length - 1])}</li>`
       )
       .join("");
 
@@ -159,16 +159,16 @@ export default function CrearReservaPage() {
     });
 
     if (result.isConfirmed) {
-      // Pedir datos del titular (Wireframe 4d)
+      // CORRECCIÓN 2: Modal de Datos del Titular (Apellido, Nombre, Teléfono)
       const { value: datos } = await Swal.fire({
         title: "Datos del Titular de la Reserva",
         html: `
             <div class="flex flex-col gap-3 text-left">
-              <label>DNI <span class="text-red-500">*</span></label>
-              <input id="swal-dni" class="swal2-input m-0" placeholder="Ej: 12345678">
+              <label>Apellido <span class="text-red-500">*</span></label>
+              <input id="swal-apellido" class="swal2-input m-0" placeholder="Ej: Perez">
               
-              <label>Nombre Completo <span class="text-red-500">*</span></label>
-              <input id="swal-nombre" class="swal2-input m-0" placeholder="Ej: Juan Perez">
+              <label>Nombre <span class="text-red-500">*</span></label>
+              <input id="swal-nombre" class="swal2-input m-0" placeholder="Ej: Juan">
               
               <label>Teléfono <span class="text-red-500">*</span></label>
               <input id="swal-tel" class="swal2-input m-0" placeholder="Ej: 341...">
@@ -178,47 +178,75 @@ export default function CrearReservaPage() {
         showCancelButton: true,
         confirmButtonText: "Confirmar",
         preConfirm: () => {
-          const dni = (document.getElementById("swal-dni") as HTMLInputElement)
-            .value;
+          const apellido = (
+            document.getElementById("swal-apellido") as HTMLInputElement
+          ).value;
           const nombre = (
             document.getElementById("swal-nombre") as HTMLInputElement
           ).value;
           const telefono = (
             document.getElementById("swal-tel") as HTMLInputElement
           ).value;
-          if (!dni || !nombre || !telefono) {
+
+          // Validaciones requeridas
+          if (!apellido || !nombre || !telefono) {
             Swal.showValidationMessage("Todos los campos son obligatorios");
+            return false;
           }
-          return { dni, nombre, telefono };
+
+          // Validación: No se permiten números en Apellido ni Nombre
+          const regexTexto = /^[a-zA-Z\s]+$/;
+          if (!regexTexto.test(apellido)) {
+            Swal.showValidationMessage(
+              "El apellido no debe contener números ni símbolos"
+            );
+            return false;
+          }
+          if (!regexTexto.test(nombre)) {
+            Swal.showValidationMessage(
+              "El nombre no debe contener números ni símbolos"
+            );
+            return false;
+          }
+
+          return { apellido, nombre, telefono };
         },
       });
 
       if (datos) {
         setLoading(true);
         try {
-          // Crear las reservas una por una llamando al endpoint real
           for (const p of pendientes) {
-            // BACKEND: ControladorReserva.crearReserva espera:
-            // tipo, numero, fechaInicio, fechaFin, body(titular)
-            await apiClient.postParams("/reservas/crear", {
+            // CORRECCIÓN 3: Envío correcto de Params (URL) y Body (JSON)
+            // Construimos la URL con los Query Params
+            const queryParams = new URLSearchParams({
               tipo: tipoHabitacion,
-              numero: p.habitacion,
-              fechaInicio: p.fechas[0], // Formato yyyy-mm-dd
+              numero: p.habitacion.toString(),
+              fechaInicio: p.fechas[0],
               fechaFin: p.fechas[p.fechas.length - 1],
-            });
-            // Nota: Tu backend actual en ControladorReserva recibe el Titular en el Body
-            // pero el método postParams actual de apiClient no manda body JSON junto con params.
-            // Si quieres mandar el titular, habría que ajustar apiClient o el backend.
-            // Por ahora, tu backend crea un titular vacío si llega null, así que funcionará (creará la reserva).
+            }).toString();
+
+            // El body es el objeto titular
+            const bodyTitular = {
+              nombre: datos.nombre,
+              apellido: datos.apellido,
+              telefono: datos.telefono,
+              // Enviamos campos vacíos requeridos por DTO para evitar errores
+              nroDocumento: "",
+              tipo_documento: "DNI", // Default técnico
+            };
+
+            // Usamos apiClient.post pasando la URL completa con query params
+            await apiClient.post(`/reservas/crear?${queryParams}`, bodyTitular);
           }
 
           await showSuccess(
             "¡Reservas Creadas!",
             "Las habitaciones han sido reservadas con éxito en el sistema."
           );
-          setPendientes([]);
-          setHabitaciones([]);
-          setTipoHabitacion("");
+
+          // CORRECCIÓN 4: Navegación al terminar
+          router.push("/"); // Volver al Home
         } catch (error: any) {
           showError("Error al guardar la reserva: " + error.message);
         } finally {
@@ -330,10 +358,11 @@ export default function CrearReservaPage() {
                     </div>
                     <div className="text-gray-600 text-xs mt-1 flex flex-col">
                       <span>
-                        <b>Desde:</b> {p.fechas[0]}
+                        <b>Desde:</b> {formatFecha(p.fechas[0])}
                       </span>
                       <span>
-                        <b>Hasta:</b> {p.fechas[p.fechas.length - 1]}
+                        <b>Hasta:</b>{" "}
+                        {formatFecha(p.fechas[p.fechas.length - 1])}
                       </span>
                     </div>
                   </li>
@@ -351,6 +380,13 @@ export default function CrearReservaPage() {
             </Button>
           </div>
         )}
+      </div>
+
+      {/* Botón Volver al final de la página */}
+      <div className="flex justify-end mt-8">
+        <Button variant="secondary" onClick={() => router.push("/")}>
+          Volver al Menú
+        </Button>
       </div>
     </MainContainer>
   );
