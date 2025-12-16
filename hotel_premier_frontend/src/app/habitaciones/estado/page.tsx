@@ -13,12 +13,8 @@ import { HabitacionDTO, TipoHabitacion } from "@/api/types";
 export default function EstadoHabitacionesPage() {
   const { showError } = useAlert();
 
-  const today = new Date().toISOString().split("T")[0];
-  const nextWeek = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split("T")[0];
-
-  const [fechas, setFechas] = useState({ desde: today, hasta: nextWeek });
+  // 1. Inicializamos con cadenas vacías
+  const [fechas, setFechas] = useState({ desde: "", hasta: "" });
   const [habitaciones, setHabitaciones] = useState<HabitacionDTO[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -39,11 +35,11 @@ export default function EstadoHabitacionesPage() {
       setLoading(false);
     }
   };
-
+  /*
   useEffect(() => {
     handleSearch();
   }, []);
-
+  */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFechas({ ...fechas, [e.target.name]: e.target.value });
   };
