@@ -22,44 +22,24 @@ export enum EstadoHabitacion {
   DISPONIBLE = "Disponible",
 }
 
-export enum Banco {
-  BNA = "BNA",
-  MACRO = "Macro",
-  SANTA_FE = "Santa_Fe",
-  GALICIA = "Galicia",
-  BBVA = "BBVA",
-  SANTANDER = "Santander",
-  HSBC = "HSBC",
-  ICBC = "ICBC",
-  OTRO = "OTRO",
-}
-
-export enum TipoDocumento {
-  DNI = "DNI",
-  PASAPORTE = "Pasaporte",
-  LC = "Libreta Cívica",
-  LE = "Libreta de Enrolamiento",
-}
-
+// CORREGIDO: Alineado 100% con tu Backend Java (HuespedDTO.java)
 export interface HuespedDTO {
-  id?: number;
   nombre: string;
   apellido: string;
-  tipoDocumento: TipoDocumento | string;
-  documento: string;
-  fechaNacimiento?: string;
-  email: string;
+  tipo_documento: TipoDoc | string; // Back envía "tipo_documento"
+  nroDocumento: string; // Back envía "nroDocumento"
+  fechaDeNacimiento?: string; // Back envía "fechaDeNacimiento"
+  email?: string;
   telefono: string;
-  calle?: string;
-  numeroCalle?: string;
-  pais?: string;
-  provincia?: string;
-  ciudad?: string;
-  codigoPostal?: string;
-  // Campos extra para el alta completa
+
+  // Dirección es un solo string en tu back actual
+  direccion?: string;
+
   ocupacion?: string;
   nacionalidad?: string;
   alojado?: boolean;
+  cuit?: string;
+  posicionIVA?: string;
 }
 
 export interface PersonaFisicaDTO {
@@ -94,32 +74,31 @@ export interface DisponibilidadReserva {
   sd2: boolean;
 }
 
-// --- NUEVO DTO PARA CU06 ---
 export interface ReservaListadoDTO {
   id: number;
   habitacion: number;
   tipoHabitacion: string;
-  fechaInicio: string; // YYYY-MM-DD
+  fechaInicio: string;
   fechaFin: string;
   huespedNombre: string;
   huespedApellido: string;
-  estado: string; // "RESERVADA", etc.
+  estado: string;
 }
 
-// --- NUEVO DTO PARA CU07 (Facturación) ---
-
-// DTO para el Paso 1: Ocupantes
+// Facturación
 export interface OcupanteDTO {
-  id: number;
   nombre: string;
   apellido: string;
-  documento: string;
+  nroDocumento: string;
+  tipo_documento: string;
+  // Campos opcionales para mapeo interno
+  id?: number;
+  documento?: string;
 }
 
-// DTO para el Paso 2: Items
 export interface ItemFacturaDTO {
   id: number;
-  fecha: string; // "11/04/2025"
-  consumo: string; // "Estadía", "Bar", etc.
+  fecha: string;
+  consumo: string;
   monto: number;
 }

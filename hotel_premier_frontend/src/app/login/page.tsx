@@ -26,9 +26,15 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    reset, // 1. Importamos la función reset
     formState: { errors },
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
+    defaultValues: {
+      // 2. Definimos valores iniciales vacíos
+      usuario: "",
+      clave: "",
+    },
   });
 
   const onSubmit = async (data: LoginForm) => {
@@ -46,10 +52,11 @@ export default function LoginPage() {
         `Hola de nuevo, ${response.usuario.nombre}`
       );
 
-      // Redirigir al home (o a donde prefieras)
+      // Redirigir al home
       router.push("/");
     } catch (error: any) {
       showError(error.message || "Error al iniciar sesión");
+      reset(); // 3. ¡Aquí limpiamos los campos si falla!
     } finally {
       setLoading(false);
     }

@@ -7,13 +7,13 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { HuespedDTO, TipoDocumento } from "@/api/types";
+import { huespedService } from "@/api/huespedService"; // Importamos servicio real
 import { useAlert } from "@/hooks/useAlert";
 
 export default function BuscarHuespedPage() {
   const router = useRouter();
   const { showError } = useAlert();
 
-  // --- ESTADOS ---
   const [filtros, setFiltros] = useState({
     nombre: "",
     apellido: "",
@@ -24,74 +24,34 @@ export default function BuscarHuespedPage() {
   const [huespedes, setHuespedes] = useState<HuespedDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [busquedaRealizada, setBusquedaRealizada] = useState(false);
-
-  // Estado para la fila seleccionada (guardamos el documento)
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
 
-  // --- LÓGICA DE BÚSQUEDA ---
+  // --- LÓGICA DE BÚSQUEDA REAL ---
   const handleSearch = async () => {
     setLoading(true);
     setBusquedaRealizada(true);
-    setSelectedDoc(null); // Limpiamos selección al buscar de nuevo
+    setSelectedDoc(null);
 
-    // SIMULACIÓN (Aquí iría: await huespedService.buscar(filtros))
-    setTimeout(() => {
-      const mockDB: HuespedDTO[] = [
-        {
-          id: 1,
-          nombre: "Lionel Andrés",
-          apellido: "Messi",
-          tipoDocumento: TipoDocumento.DNI,
-          documento: "10101010",
-          email: "lio@messi.com",
-          telefono: "12345678",
-          calle: "Miami",
-          ocupacion: "Futbolista",
-          nacionalidad: "Argentina",
-        },
-        {
-          id: 2,
-          nombre: "Julián",
-          apellido: "Álvarez",
-          tipoDocumento: TipoDocumento.DNI,
-          documento: "20202020",
-          email: "araña@river.com",
-          telefono: "87654321",
-          calle: "Manchester",
-          ocupacion: "Futbolista",
-          nacionalidad: "Argentina",
-        },
-      ];
-
-      // Filtro local simulado
-      const resultados = mockDB.filter((h) => {
-        const matchNombre = filtros.nombre
-          ? h.nombre.toLowerCase().includes(filtros.nombre.toLowerCase())
-          : true;
-        const matchApellido = filtros.apellido
-          ? h.apellido.toLowerCase().includes(filtros.apellido.toLowerCase())
-          : true;
-        const matchDoc = filtros.documento
-          ? h.documento.includes(filtros.documento)
-          : true;
-
-        // Validación segura de tipo de documento
-        const matchTipo = filtros.tipoDocumento
-          ? h.tipoDocumento === filtros.tipoDocumento
-          : true;
-
-        return matchNombre && matchApellido && matchDoc && matchTipo;
+    try {
+      // Llamada real al backend
+      const resultados = await huespedService.buscar({
+        nombre: filtros.nombre,
+        apellido: filtros.apellido,
+        documento: filtros.documento,
+        tipoDocumento: filtros.tipoDocumento,
       });
-
       setHuespedes(resultados);
+    } catch (err) {
+      console.error(err);
+      showError("Error al buscar huéspedes o no hay conexión.");
+      setHuespedes([]);
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
-  // --- LÓGICA DE NAVEGACIÓN ---
   const handleNext = () => {
     if (selectedDoc) {
-      // Redirigimos a la ruta dinámica que creamos
       router.push(`/huespedes/editar/${selectedDoc}`);
     } else {
       showError("Debe seleccionar un huésped para continuar.");
@@ -100,7 +60,7 @@ export default function BuscarHuespedPage() {
 
   return (
     <MainContainer title="Buscar Huésped">
-      {/* 1. SECCIÓN DE FILTROS (DISEÑO 2x2) */}
+      {/* 1. FILTROS */}
       <div className="bg-white p-6 rounded-lg border border-legacy-inputBorder shadow-sm mb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
           <Input
@@ -124,8 +84,10 @@ export default function BuscarHuespedPage() {
               setFiltros({ ...filtros, tipoDocumento: e.target.value })
             }
             options={[
-              { label: "DNI", value: TipoDocumento.DNI },
-              { label: "Pasaporte", value: TipoDocumento.PASAPORTE },
+              { label: "DNI", value: "DNI" }, // Ojo: deben coincidir con Enum Back
+              { label: "Pasaporte", value: "PASAPORTE" },
+              { label: "Libreta Cívica", value: "LC" },
+              { label: "Libreta Enrolamiento", value: "LE" },
             ]}
           />
           <Input
@@ -161,16 +123,14 @@ export default function BuscarHuespedPage() {
         </div>
       </div>
 
-      {/* 2. SECCIÓN DE RESULTADOS */}
+      {/* 2. RESULTADOS */}
       <div className="border border-legacy-inputBorder rounded-lg bg-white shadow-sm overflow-hidden flex flex-col">
-        {/* Cabecera del contenedor */}
         <div className="px-4 py-3 border-b border-legacy-inputBorder bg-white">
-          <h3 className="text-gray-700 font-semibold text-sm text-center md:text-left">
+          <h3 className="text-gray-700 font-semibold text-sm">
             Huéspedes encontrados ({huespedes.length})
           </h3>
         </div>
 
-        {/* Tabla con scroll */}
         <div className="flex-1 min-h-[250px] max-h-[300px] overflow-y-auto">
           <table className="w-full text-sm text-center border-collapse">
             <thead className="text-xs text-gray-600 font-bold bg-white border-b border-legacy-inputBorder sticky top-0 z-10 shadow-sm">
@@ -196,10 +156,10 @@ export default function BuscarHuespedPage() {
               ) : huespedes.length > 0 ? (
                 huespedes.map((h) => (
                   <tr
-                    key={h.id}
-                    onClick={() => setSelectedDoc(h.documento)}
+                    key={h.nroDocumento} // Usamos nroDocumento como key
+                    onClick={() => setSelectedDoc(h.nroDocumento)}
                     className={`cursor-pointer transition-colors ${
-                      selectedDoc === h.documento
+                      selectedDoc === h.nroDocumento
                         ? "bg-blue-100 text-blue-900 font-medium"
                         : "hover:bg-blue-50"
                     }`}
@@ -211,7 +171,7 @@ export default function BuscarHuespedPage() {
                       {h.apellido}
                     </td>
                     <td className="px-6 py-3">
-                      {h.tipoDocumento} {h.documento}
+                      {h.tipo_documento} {h.nroDocumento}
                     </td>
                   </tr>
                 ))
@@ -231,7 +191,6 @@ export default function BuscarHuespedPage() {
           </table>
         </div>
 
-        {/* Footer con Botón Siguiente */}
         <div className="p-4 border-t border-legacy-inputBorder flex justify-end bg-gray-50">
           <Button
             variant={selectedDoc ? "primary" : "secondary"}

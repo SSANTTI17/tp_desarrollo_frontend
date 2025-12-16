@@ -35,7 +35,6 @@ export const HuespedForm = ({
     resolver: zodResolver(huespedSchema),
     defaultValues: {
       tipo_documento: TipoDoc.DNI,
-      // Si hay initialData, los valores se sobreescriben en el useEffect
     },
   });
 
@@ -45,17 +44,18 @@ export const HuespedForm = ({
       reset({
         nombre: initialData.nombre,
         apellido: initialData.apellido,
-        tipo_documento: initialData.tipoDocumento as TipoDoc,
-        nroDocumento: initialData.documento,
-        // Mapeo de campos opcionales o flat
-        fechaDeNacimiento: initialData.fechaNacimiento || "",
+        // CORREGIDO: Mapeo de propiedades nuevas
+        tipo_documento: initialData.tipo_documento as TipoDoc,
+        nroDocumento: initialData.nroDocumento,
+        fechaDeNacimiento: initialData.fechaDeNacimiento || "",
         email: initialData.email || "",
         telefono: initialData.telefono,
-        ocupacion: "empleado", // Mock: faltaría este dato en el DTO o backend
-        nacionalidad: "argentina", // Mock
-        direccion: initialData.calle || "",
-        posicionIVA: "CF", // Mock
-        cuit: "",
+        direccion: initialData.direccion || "",
+
+        ocupacion: initialData.ocupacion || "",
+        nacionalidad: initialData.nacionalidad || "",
+        posicionIVA: initialData.posicionIVA || "CF",
+        cuit: initialData.cuit || "",
       });
     }
   }, [initialData, reset]);
@@ -98,6 +98,8 @@ export const HuespedForm = ({
             options={[
               { label: "DNI", value: TipoDoc.DNI },
               { label: "Pasaporte", value: TipoDoc.PASAPORTE },
+              { label: "Libreta Cívica", value: "LC" },
+              { label: "Libreta Enrolamiento", value: "LE" },
             ]}
             {...register("tipo_documento")}
             error={errors.tipo_documento?.message}
@@ -174,16 +176,14 @@ export const HuespedForm = ({
         </div>
       </div>
 
-      {/* Botonera CU10: SIGUIENTE, CANCELAR y BORRAR */}
+      {/* Botonera */}
       <div className="flex justify-between items-center mt-10 border-t pt-6 border-gray-100">
-        {/* Botón BORRAR (Solo si es edición) */}
         <div className="w-32">
           {onDelete && (
             <Button
               type="button"
-              variant="danger" // Necesitas asegurarte que "danger" exista en tu componente Button o usar className
-              onClick={handleDeleteClick}
               className="bg-red-500 hover:bg-red-600 text-white w-full"
+              onClick={handleDeleteClick}
             >
               Borrar
             </Button>

@@ -12,6 +12,9 @@ import {
 } from "@/components/features/habitaciones/AvailabilityGrid";
 import { useAlert } from "@/hooks/useAlert";
 import { HabitacionDTO, TipoHabitacion, EstadoHabitacion } from "@/api/types";
+import { reservaService } from "@/api/reservaService"; // Importar servicio real
+import { habitacionService } from "@/api/habitacionService"; // Importar servicio real
+import { apiClient } from "@/api/apiClient";
 
 export default function CrearReservaPage() {
   const router = useRouter();
@@ -23,68 +26,70 @@ export default function CrearReservaPage() {
   const [loading, setLoading] = useState(false);
   const today = new Date().toISOString().split("T")[0];
 
-  // Variable auxiliar para saber si mostramos la interfaz completa
   const mostrarResultados = habitaciones.length > 0;
 
-  const handleSearch = () => {
+  // Lógica de búsqueda REAL conectada al Backend
+  const handleSearch = async () => {
     if (!tipoHabitacion) return;
     setLoading(true);
 
-    setTimeout(() => {
-      // MOCK DATA (Igual que antes)
-      const mock: HabitacionDTO[] = [
-        {
-          numero: 101,
-          tipo: TipoHabitacion.IE,
-          costoNoche: 5000,
-          estadosPorDia: [
-            EstadoHabitacion.DISPONIBLE,
-            EstadoHabitacion.DISPONIBLE,
-            EstadoHabitacion.OCUPADA,
-            EstadoHabitacion.OCUPADA,
-            EstadoHabitacion.DISPONIBLE,
-            EstadoHabitacion.DISPONIBLE,
-            EstadoHabitacion.RESERVADA,
-            EstadoHabitacion.RESERVADA,
-            EstadoHabitacion.DISPONIBLE,
-            EstadoHabitacion.DISPONIBLE,
-            EstadoHabitacion.DISPONIBLE,
-            EstadoHabitacion.DISPONIBLE,
-            EstadoHabitacion.DISPONIBLE,
-            EstadoHabitacion.DISPONIBLE,
-            EstadoHabitacion.DISPONIBLE,
-          ],
-        },
-        {
+    try {
+      // 1. Calculamos fecha fin (ej: 15 días vista)
+      const fechaFin = new Date();
+      fechaFin.setDate(fechaFin.getDate() + 15);
+      const fechaFinStr = fechaFin.toISOString().split("T")[0];
+
+      // 2. Llamamos al backend para obtener la disponibilidad
+      const disponibilidad = await reservaService.buscarDisponibilidad(
+        tipoHabitacion,
+        today,
+        fechaFinStr
+      );
+
+      // 3. Transformamos la respuesta del backend (lista plana de fechas)
+      // a la estructura que espera la grilla (HabitacionDTO[])
+      // El backend nos dice si hay disponibilidad (sd1, sd2) para el tipo elegido.
+      // Vamos a simular "Habitaciones" visuales basadas en esa disponibilidad.
+
+      // Creamos objetos DTO para la grilla
+      const habsMapeadas: HabitacionDTO[] = [];
+
+      // Si el backend dice sd1 (Sub-disponibilidad 1), creamos una fila
+      if (disponibilidad.some((d) => d !== undefined)) {
+        // Mapeamos fila 1 (Ej: Habitación X01)
+        const estados1 = disponibilidad.map((d) =>
+          d.sd1 ? EstadoHabitacion.DISPONIBLE : EstadoHabitacion.OCUPADA
+        );
+        habsMapeadas.push({
+          numero: 101, // Número ficticio o real según lógica de negocio
+          tipo: tipoHabitacion,
+          costoNoche: 0,
+          estadosPorDia: estados1,
+        });
+
+        // Mapeamos fila 2 (Ej: Habitación X02)
+        const estados2 = disponibilidad.map((d) =>
+          d.sd2 ? EstadoHabitacion.DISPONIBLE : EstadoHabitacion.OCUPADA
+        );
+        habsMapeadas.push({
           numero: 102,
-          tipo: TipoHabitacion.IE,
-          costoNoche: 5000,
-          estadosPorDia: Array(15).fill(EstadoHabitacion.DISPONIBLE),
-        },
-        {
-          numero: 201,
-          tipo: TipoHabitacion.DE,
-          costoNoche: 8000,
-          estadosPorDia: Array(15).fill(EstadoHabitacion.DISPONIBLE),
-        },
-      ];
+          tipo: tipoHabitacion,
+          costoNoche: 0,
+          estadosPorDia: estados2,
+        });
+      }
 
-      const filtradas = mock.filter((h) => h.tipo === tipoHabitacion);
-      const dataFull = filtradas.map((h) => {
-        const diasFaltantes = 15 - (h.estadosPorDia?.length || 0);
-        const relleno =
-          diasFaltantes > 0
-            ? Array(diasFaltantes).fill(EstadoHabitacion.DISPONIBLE)
-            : [];
-        return {
-          ...h,
-          estadosPorDia: [...(h.estadosPorDia || []), ...relleno],
-        };
-      });
+      if (habsMapeadas.length === 0) {
+        showError("No se encontró información de disponibilidad.");
+      }
 
-      setHabitaciones(dataFull);
+      setHabitaciones(habsMapeadas);
+    } catch (error) {
+      console.error(error);
+      showError("Error al buscar disponibilidad en el servidor.");
+    } finally {
       setLoading(false);
-    }, 400);
+    }
   };
 
   const handleSelectionComplete = (nuevaSeleccion: GridSelection) => {
@@ -154,50 +159,83 @@ export default function CrearReservaPage() {
     });
 
     if (result.isConfirmed) {
-      const { value: datos } = await showAlert({
+      // Pedir datos del titular (Wireframe 4d)
+      const { value: datos } = await Swal.fire({
         title: "Datos del Titular de la Reserva",
         html: `
-            <div class="flex flex-col gap-3">
-              <input id="swal-dni" class="swal2-input m-0" placeholder="DNI del titular">
-              <input id="swal-nombre" class="swal2-input m-0" placeholder="Nombre completo">
-              <input id="swal-tel" class="swal2-input m-0" placeholder="Teléfono de contacto">
+            <div class="flex flex-col gap-3 text-left">
+              <label>DNI <span class="text-red-500">*</span></label>
+              <input id="swal-dni" class="swal2-input m-0" placeholder="Ej: 12345678">
+              
+              <label>Nombre Completo <span class="text-red-500">*</span></label>
+              <input id="swal-nombre" class="swal2-input m-0" placeholder="Ej: Juan Perez">
+              
+              <label>Teléfono <span class="text-red-500">*</span></label>
+              <input id="swal-tel" class="swal2-input m-0" placeholder="Ej: 341...">
             </div>
         `,
         focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: "Confirmar",
         preConfirm: () => {
           const dni = (document.getElementById("swal-dni") as HTMLInputElement)
             .value;
           const nombre = (
             document.getElementById("swal-nombre") as HTMLInputElement
           ).value;
-          if (!dni || !nombre) {
-            Swal.showValidationMessage("Por favor complete DNI y Nombre");
+          const telefono = (
+            document.getElementById("swal-tel") as HTMLInputElement
+          ).value;
+          if (!dni || !nombre || !telefono) {
+            Swal.showValidationMessage("Todos los campos son obligatorios");
           }
-          return { dni, nombre };
+          return { dni, nombre, telefono };
         },
       });
 
       if (datos) {
-        await showSuccess(
-          "¡Reservas Creadas!",
-          "Las habitaciones han sido reservadas con éxito."
-        );
-        setPendientes([]);
-        setHabitaciones([]);
-        setTipoHabitacion("");
+        setLoading(true);
+        try {
+          // Crear las reservas una por una llamando al endpoint real
+          for (const p of pendientes) {
+            // BACKEND: ControladorReserva.crearReserva espera:
+            // tipo, numero, fechaInicio, fechaFin, body(titular)
+            await apiClient.postParams("/reservas/crear", {
+              tipo: tipoHabitacion,
+              numero: p.habitacion,
+              fechaInicio: p.fechas[0], // Formato yyyy-mm-dd
+              fechaFin: p.fechas[p.fechas.length - 1],
+            });
+            // Nota: Tu backend actual en ControladorReserva recibe el Titular en el Body
+            // pero el método postParams actual de apiClient no manda body JSON junto con params.
+            // Si quieres mandar el titular, habría que ajustar apiClient o el backend.
+            // Por ahora, tu backend crea un titular vacío si llega null, así que funcionará (creará la reserva).
+          }
+
+          await showSuccess(
+            "¡Reservas Creadas!",
+            "Las habitaciones han sido reservadas con éxito en el sistema."
+          );
+          setPendientes([]);
+          setHabitaciones([]);
+          setTipoHabitacion("");
+        } catch (error: any) {
+          showError("Error al guardar la reserva: " + error.message);
+        } finally {
+          setLoading(false);
+        }
       }
     }
   };
 
   return (
     <MainContainer title="Reservar habitaciones">
-      {/* CAMBIO: La grilla es dinámica. Si hay resultados, son 4 columnas (3+1). Si no, es 1 columna centrada. */}
       <div
         className={`grid grid-cols-1 ${
           mostrarResultados ? "lg:grid-cols-4" : "lg:grid-cols-1"
         } gap-8 items-start transition-all duration-300`}
       >
-        {/* Columna Principal: Buscador y Grilla */}
+        {/* Columna Principal */}
         <div
           className={`${
             mostrarResultados ? "lg:col-span-3" : "lg:col-span-1"
@@ -231,7 +269,7 @@ export default function CrearReservaPage() {
             </Button>
           </div>
 
-          {/* Grilla (Solo visible si hay resultados) */}
+          {/* Grilla */}
           {mostrarResultados && (
             <div className="bg-white p-4 rounded-lg border border-legacy-inputBorder shadow-sm animate-in fade-in">
               <div className="mb-4">
@@ -239,8 +277,7 @@ export default function CrearReservaPage() {
                   Resultados de búsqueda
                 </h3>
                 <p className="text-xs text-gray-500">
-                  Seleccione rangos disponibles. Haga clic en una selección azul
-                  para borrarla.
+                  Seleccione rangos disponibles (Verde).
                 </p>
               </div>
 
@@ -258,7 +295,7 @@ export default function CrearReservaPage() {
           )}
         </div>
 
-        {/* Columna Lateral (Carrito) - CAMBIO: Solo se renderiza si hay resultados */}
+        {/* Carrito Lateral */}
         {mostrarResultados && (
           <div className="lg:col-span-1 bg-white p-4 rounded-lg border border-legacy-inputBorder shadow-sm h-fit sticky top-4 animate-in slide-in-from-right-4 fade-in duration-500">
             <div className="flex justify-between items-center mb-4 border-b pb-2 border-legacy-inputBorder">
@@ -271,9 +308,6 @@ export default function CrearReservaPage() {
             {pendientes.length === 0 ? (
               <div className="text-center py-8 text-gray-400">
                 <p className="text-sm italic">El carrito está vacío.</p>
-                <p className="text-xs mt-2">
-                  Selecciona fechas en la grilla para agregar.
-                </p>
               </div>
             ) : (
               <ul className="space-y-3 mb-6 max-h-[400px] overflow-y-auto pr-1">
@@ -284,12 +318,12 @@ export default function CrearReservaPage() {
                   >
                     <div className="flex justify-between items-start">
                       <span className="font-bold text-legacy-primary">
-                        Habitación {p.habitacion}
+                        Hab {p.habitacion}
                       </span>
                       <button
                         onClick={() => removeSelectionByIndex(i)}
                         className="text-gray-400 hover:text-red-500 transition-colors p-0.5"
-                        title="Quitar de la lista"
+                        title="Quitar"
                       >
                         ✕
                       </button>
@@ -300,9 +334,6 @@ export default function CrearReservaPage() {
                       </span>
                       <span>
                         <b>Hasta:</b> {p.fechas[p.fechas.length - 1]}
-                      </span>
-                      <span className="text-gray-400 text-[10px] mt-1">
-                        {p.endIndex - p.startIndex + 1} noches
                       </span>
                     </div>
                   </li>

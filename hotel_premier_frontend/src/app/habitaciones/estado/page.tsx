@@ -8,12 +8,11 @@ import { Tabs } from "@/components/ui/Tabs";
 import { AvailabilityGrid } from "@/components/features/habitaciones/AvailabilityGrid";
 import { habitacionService } from "@/api/habitacionService";
 import { useAlert } from "@/hooks/useAlert";
-import { HabitacionDTO, TipoHabitacion, EstadoHabitacion } from "@/api/types";
+import { HabitacionDTO, TipoHabitacion } from "@/api/types";
 
 export default function EstadoHabitacionesPage() {
   const { showError } = useAlert();
 
-  // Fechas por defecto (hoy y 15 días después)
   const today = new Date().toISOString().split("T")[0];
   const nextWeek = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000)
     .toISOString()
@@ -23,88 +22,24 @@ export default function EstadoHabitacionesPage() {
   const [habitaciones, setHabitaciones] = useState<HabitacionDTO[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Cargar datos (Simulado o Real)
   const handleSearch = async () => {
     setLoading(true);
     try {
-      // Llamada real al backend
-      // const data = await habitacionService.getEstado(fechas.desde, fechas.hasta);
-      // setHabitaciones(data);
-
-      // --- MODO SIMULACIÓN PARA QUE VEAS LA GRILLA YA ---
-      setTimeout(() => {
-        const mockData: HabitacionDTO[] = [
-          // Individuales
-          {
-            numero: 101,
-            tipo: TipoHabitacion.IE,
-            costoNoche: 100,
-            estadosPorDia: [
-              EstadoHabitacion.DISPONIBLE,
-              EstadoHabitacion.OCUPADA,
-              EstadoHabitacion.OCUPADA,
-              EstadoHabitacion.DISPONIBLE,
-            ],
-          },
-          {
-            numero: 102,
-            tipo: TipoHabitacion.IE,
-            costoNoche: 100,
-            estadosPorDia: [
-              EstadoHabitacion.DISPONIBLE,
-              EstadoHabitacion.DISPONIBLE,
-              EstadoHabitacion.DISPONIBLE,
-              EstadoHabitacion.DISPONIBLE,
-            ],
-          },
-          // Dobles
-          {
-            numero: 201,
-            tipo: TipoHabitacion.DE,
-            costoNoche: 200,
-            estadosPorDia: [
-              EstadoHabitacion.OCUPADA,
-              EstadoHabitacion.OCUPADA,
-              EstadoHabitacion.DISPONIBLE,
-              EstadoHabitacion.DISPONIBLE,
-            ],
-          },
-          {
-            numero: 202,
-            tipo: TipoHabitacion.DE,
-            costoNoche: 200,
-            estadosPorDia: [
-              EstadoHabitacion.RESERVADA,
-              EstadoHabitacion.RESERVADA,
-              EstadoHabitacion.RESERVADA,
-              EstadoHabitacion.DISPONIBLE,
-            ],
-          },
-        ];
-        // Rellenamos arrays para que tengan longitud de días
-        const diasDiff =
-          Math.floor(
-            (new Date(fechas.hasta).getTime() -
-              new Date(fechas.desde).getTime()) /
-              (1000 * 3600 * 24)
-          ) + 1;
-        const dataCompleta = mockData.map((h) => ({
-          ...h,
-          estadosPorDia: Array(diasDiff)
-            .fill(h.estadosPorDia[0] || EstadoHabitacion.DISPONIBLE)
-            .map((_, i) => h.estadosPorDia[i % h.estadosPorDia.length]),
-        }));
-
-        setHabitaciones(dataCompleta);
-        setLoading(false);
-      }, 500);
+      // LLAMADA REAL AL BACKEND
+      const data = await habitacionService.getEstado(
+        fechas.desde,
+        fechas.hasta
+      );
+      setHabitaciones(data);
     } catch (error: any) {
-      showError("Error al cargar estado de habitaciones");
+      showError(
+        "Error al cargar estado de habitaciones. Verifique que el backend esté corriendo."
+      );
+    } finally {
       setLoading(false);
     }
   };
 
-  // Cargar al inicio automáticamente
   useEffect(() => {
     handleSearch();
   }, []);
@@ -113,9 +48,10 @@ export default function EstadoHabitacionesPage() {
     setFechas({ ...fechas, [e.target.name]: e.target.value });
   };
 
-  // Función para filtrar habitaciones por tipo y calcular días
   const getGridContent = (tipo: TipoHabitacion) => {
+    // Filtramos lo que vino del backend
     const filtradas = habitaciones.filter((h) => h.tipo === tipo);
+    // Calculamos días para la grilla
     const dias =
       Math.floor(
         (new Date(fechas.hasta).getTime() - new Date(fechas.desde).getTime()) /
@@ -131,7 +67,7 @@ export default function EstadoHabitacionesPage() {
     );
   };
 
-  // Definición de las Pestañas
+  // Pestañas (Igual que antes)
   const tabs = [
     {
       id: "ie",
@@ -162,7 +98,6 @@ export default function EstadoHabitacionesPage() {
 
   return (
     <MainContainer title="Estado de habitaciones">
-      {/* Filtros Superiores */}
       <div className="flex flex-col md:flex-row gap-6 mb-8 items-end justify-between bg-white p-4 rounded-lg border border-legacy-inputBorder shadow-sm">
         <div className="flex gap-6 w-full md:w-auto">
           <DateInput
@@ -182,18 +117,13 @@ export default function EstadoHabitacionesPage() {
           Actualizar
         </Button>
       </div>
-
-      {/* Contenedor de Pestañas y Grilla */}
       <div className="bg-white rounded-lg shadow-sm border border-legacy-inputBorder p-4">
-        <h3 className="text-sm text-gray-500 font-semibold mb-4 text-center">
-          Habitaciones disponibles
-        </h3>
         <Tabs tabs={tabs} />
       </div>
-
-      {/* Botón Siguiente inferior */}
       <div className="flex justify-end mt-6">
-        <Button variant="secondary">Siguiente</Button>
+        <Button variant="secondary" onClick={() => window.history.back()}>
+          Volver
+        </Button>
       </div>
     </MainContainer>
   );

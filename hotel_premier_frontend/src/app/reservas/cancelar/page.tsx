@@ -5,7 +5,8 @@ import { MainContainer } from "@/components/ui/MainContainer";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useAlert } from "@/hooks/useAlert";
-import { ReservaListadoDTO } from "@/api/types"; // Importamos el tipo nuevo
+import { reservaService } from "@/api/reservaService";
+import { ReservaListadoDTO } from "@/api/types";
 
 export default function CancelarReservaPage() {
   const { showAlert, showSuccess, showError } = useAlert();
@@ -16,7 +17,6 @@ export default function CancelarReservaPage() {
   const [busquedaRealizada, setBusquedaRealizada] = useState(false);
 
   const handleSearch = async () => {
-    // Validación PDF: "El actor ingresa al menos el apellido" (Paso 3)
     if (!filtros.apellido.trim()) {
       showError("El campo apellido no puede estar vacío.");
       return;
@@ -26,52 +26,38 @@ export default function CancelarReservaPage() {
     setBusquedaRealizada(true);
 
     try {
-      // --- SIMULACIÓN MOCK (Borrar al integrar con Backend) ---
-      setTimeout(() => {
-        const mock: ReservaListadoDTO[] = [
-          {
-            id: 100,
-            habitacion: 101,
-            tipoHabitacion: "Individual Estándar",
-            fechaInicio: "2025-05-10",
-            fechaFin: "2025-05-15",
-            huespedApellido: "Messi",
-            huespedNombre: "Lionel",
-            estado: "RESERVADA",
-          },
-          {
-            id: 101,
-            habitacion: 205,
-            tipoHabitacion: "Suite Doble",
-            fechaInicio: "2025-06-01",
-            fechaFin: "2025-06-10",
-            huespedApellido: "Messi",
-            huespedNombre: "Lionel",
-            estado: "RESERVADA",
-          },
-        ];
-        // Filtro local simple para el mock
-        const res = mock.filter(
-          (r) =>
-            r.huespedApellido
-              .toLowerCase()
-              .includes(filtros.apellido.toLowerCase()) &&
-            (filtros.nombre
-              ? r.huespedNombre
-                  .toLowerCase()
-                  .includes(filtros.nombre.toLowerCase())
-              : true)
-        );
-        setReservas(res);
-        setLoading(false);
-      }, 600);
+      // LLAMADA REAL AL BACKEND
+      const data = await reservaService.buscarPorHuesped(
+        filtros.apellido,
+        filtros.nombre
+      );
 
-      // --- CÓDIGO REAL (Descomentar cuando el backend esté listo) ---
-      // const data = await reservaService.buscarPorHuesped(filtros.apellido, filtros.nombre);
-      // setReservas(data);
+      // Mapear respuesta del back (Entidades) a DTO visual
+      const mapeados = data.map((r: any) => ({
+        id: r.id,
+        // Si habitacionesReservadas es null o vacío, manejo de error
+        habitacion:
+          r.habitacionesReservadas && r.habitacionesReservadas.length > 0
+            ? r.habitacionesReservadas[0].numero
+            : 0,
+        tipoHabitacion:
+          r.habitacionesReservadas && r.habitacionesReservadas.length > 0
+            ? r.habitacionesReservadas[0].tipo
+            : "-",
+        fechaInicio: r.fechaIngreso ? r.fechaIngreso.split("T")[0] : "", // Formatear fecha
+        fechaFin: r.fechaEgreso ? r.fechaEgreso.split("T")[0] : "",
+        huespedNombre: r.nombre,
+        huespedApellido: r.apellido,
+        estado: "RESERVADA",
+      }));
+
+      setReservas(mapeados);
     } catch (error) {
+      console.error(error);
+      showError("Error al buscar reservas. Verifique la conexión.");
+      setReservas([]);
+    } finally {
       setLoading(false);
-      showError("Error al buscar reservas.");
     }
   };
 
@@ -98,11 +84,10 @@ export default function CancelarReservaPage() {
 
     if (result.isConfirmed) {
       try {
-        // await reservaService.cancelar(reserva.id); // Llamada al backend
+        // LLAMADA REAL AL BACKEND
+        await reservaService.cancelar(reserva.id);
 
-        // Simulación: Quitamos de la lista visualmente
         setReservas((prev) => prev.filter((r) => r.id !== reserva.id));
-
         await showSuccess(
           "Reserva Cancelada",
           "La habitación ha quedado liberada y disponible."
@@ -115,7 +100,6 @@ export default function CancelarReservaPage() {
 
   return (
     <MainContainer title="Cancelar Reserva">
-      {/* 1. BUSCADOR */}
       <div className="bg-white p-6 rounded-lg border border-legacy-inputBorder shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-1 w-full">
           <Input
@@ -144,7 +128,6 @@ export default function CancelarReservaPage() {
         </Button>
       </div>
 
-      {/* 2. RESULTADOS (GRILLA) */}
       <div className="bg-white rounded-lg border border-legacy-inputBorder shadow-sm overflow-hidden">
         <div className="bg-gray-50 px-4 py-3 border-b border-legacy-inputBorder font-semibold text-gray-700">
           Reservas Encontradas ({reservas.length})

@@ -7,7 +7,7 @@ import { HuespedForm } from "@/components/features/huespedes/HuespedForm";
 import { HuespedFormData } from "@/components/features/huespedes/huespedSchema";
 import { huespedService } from "@/api/huespedService";
 import { useAlert } from "@/hooks/useAlert";
-import { HuespedDTO, TipoDocumento } from "@/api/types";
+import { HuespedDTO } from "@/api/types";
 
 export default function EditarHuespedPage() {
   const router = useRouter();
@@ -18,45 +18,41 @@ export default function EditarHuespedPage() {
   const [huesped, setHuesped] = useState<HuespedDTO | undefined>(undefined);
   const [loading, setLoading] = useState(false);
 
-  // 1. Cargar datos del huésped al iniciar
+  // 1. Cargar datos del huésped
   useEffect(() => {
     const loadData = async () => {
-      // SIMULACIÓN: En realidad llamarías a huespedService.obtenerPorDocumento(nroDocumento)
-      // Aquí hardcodeamos para que veas la demo
-      setTimeout(() => {
-        setHuesped({
-          id: 1,
-          nombre: "Lionel Andrés",
-          apellido: "Messi",
-          tipoDocumento: TipoDocumento.DNI,
-          documento: nroDocumento, // Usamos el de la URL
-          fechaNacimiento: "1987-06-24",
-          email: "lio@messi.com",
-          telefono: "12345678",
-          calle: "Av. Siempre Viva 123",
-          ocupacion: "Futbolista",
-          nacionalidad: "Argentina",
-        });
-      }, 500);
+      try {
+        const data = await huespedService.obtenerPorDocumento(nroDocumento);
+        setHuesped(data);
+      } catch (error) {
+        console.error(error);
+        showError("No se pudo cargar el huésped o no existe.");
+        router.push("/huespedes/buscar");
+      }
     };
-    loadData();
+    if (nroDocumento) loadData();
   }, [nroDocumento]);
 
   // CU10: Modificar
   const handleUpdate = async (data: HuespedFormData) => {
     setLoading(true);
     try {
-      // Mapear form data a DTO
+      // Mapear form data a DTO con NOMBRES DE PROPIEDAD CORRECTOS (Java Backend)
       const huespedActualizado: HuespedDTO = {
-        ...huesped!, // Mantenemos ID original
+        ...huesped!,
         nombre: data.nombre,
         apellido: data.apellido,
-        tipoDocumento: data.tipo_documento,
-        documento: data.nroDocumento,
+        tipo_documento: data.tipo_documento, // Antes tipoDocumento
+        nroDocumento: data.nroDocumento, // Antes documento
         telefono: data.telefono,
         email: data.email || "",
-        calle: data.direccion,
-        // ... resto de campos
+        direccion: data.direccion, // Antes calle
+        fechaDeNacimiento: data.fechaDeNacimiento,
+
+        ocupacion: data.ocupacion,
+        nacionalidad: data.nacionalidad,
+        cuit: data.cuit,
+        posicionIVA: data.posicionIVA,
       };
 
       await huespedService.modificar(huespedActualizado);
@@ -66,8 +62,7 @@ export default function EditarHuespedPage() {
       router.push("/huespedes/buscar");
     } catch (error: any) {
       setLoading(false);
-      // Validaciones del PDF (2.B.1)
-      if (error.message.includes("existe")) {
+      if (error.message && error.message.toLowerCase().includes("existe")) {
         await showAlert({
           title: "¡CUIDADO!",
           text: "El tipo y número de documento ya existen en el sistema",
@@ -76,41 +71,35 @@ export default function EditarHuespedPage() {
           showCancelButton: true,
           cancelButtonText: "CORREGIR",
         });
-        // Lógica de aceptar igualmente...
       } else {
-        showError("Error al modificar el huésped");
+        showError(error.message || "Error al modificar el huésped");
       }
     }
   };
 
-  // CU11: Dar Baja (Botón BORRAR)
+  // CU11: Dar Baja
   const handleDelete = async () => {
     if (!huesped) return;
 
     try {
-      // 1. Llamamos al backend para verificar si se puede eliminar
-      // El controlador verifica si el huésped "isAlojado()"
       const verificacion = await huespedService.verificarBaja(
-        huesped.documento,
-        huesped.tipoDocumento.toString()
+        huesped.nroDocumento, // CORREGIDO
+        huesped.tipo_documento.toString() // CORREGIDO
       );
 
-      // 2. CASO A: No se puede eliminar (Ya tuvo estadías)
       if (!verificacion.puedeEliminar) {
         await showAlert({
           title: "No se puede eliminar",
-          text: verificacion.mensaje, // Mensaje exacto del backend (wireframe 11b)
+          text: verificacion.mensaje,
           icon: "error",
           confirmButtonText: "CONTINUAR",
         });
         return;
       }
 
-      // 3. CASO B: Se puede eliminar (Nunca se alojó)
-      // Mostramos la alerta de confirmación con el mensaje del backend (wireframe 11a)
       const result = await showAlert({
         title: "Confirmar eliminación",
-        text: verificacion.mensaje,
+        html: `Los datos del huésped <b>${huesped.apellido}, ${huesped.nombre}</b> serán eliminados del sistema.`,
         icon: "warning",
         showCancelButton: true,
         confirmButtonText: "ELIMINAR",
@@ -119,15 +108,16 @@ export default function EditarHuespedPage() {
         reverseButtons: true,
       });
 
-      // 4. Ejecución de la baja
       if (result.isConfirmed) {
         const respuesta = await huespedService.eliminar(
-          huesped.documento,
-          huesped.tipoDocumento.toString()
+          huesped.nroDocumento, // CORREGIDO
+          huesped.tipo_documento.toString() // CORREGIDO
         );
 
-        // 5. Mensaje de éxito final (wireframe 11c)
-        await showSuccess("Eliminado", respuesta.mensaje);
+        await showSuccess(
+          "Eliminado",
+          respuesta.mensaje || "Los datos han sido eliminados."
+        );
         router.push("/huespedes/buscar");
       }
     } catch (error: any) {
@@ -137,7 +127,9 @@ export default function EditarHuespedPage() {
 
   if (!huesped)
     return (
-      <div className="p-10 text-center">Cargando datos del huésped...</div>
+      <div className="p-10 text-center text-gray-500">
+        Cargando datos del huésped...
+      </div>
     );
 
   return (
@@ -146,7 +138,7 @@ export default function EditarHuespedPage() {
         initialData={huesped}
         onSubmit={handleUpdate}
         onCancel={() => router.push("/huespedes/buscar")}
-        onDelete={handleDelete} // Pasamos la función para que aparezca el botón rojo
+        onDelete={handleDelete}
         isLoading={loading}
       />
     </MainContainer>
