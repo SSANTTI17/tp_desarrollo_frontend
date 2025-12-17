@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation"; // Importamos useRouter
 import { MainContainer } from "@/components/ui/MainContainer";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -9,6 +10,7 @@ import { reservaService } from "@/api/reservaService";
 import { ReservaListadoDTO } from "@/api/types";
 
 export default function CancelarReservaPage() {
+  const router = useRouter(); // Inicializamos el router
   const { showAlert, showSuccess, showError } = useAlert();
 
   const [filtros, setFiltros] = useState({ apellido: "", nombre: "" });
@@ -26,16 +28,13 @@ export default function CancelarReservaPage() {
     setBusquedaRealizada(true);
 
     try {
-      // LLAMADA REAL AL BACKEND
       const data = await reservaService.buscarPorHuesped(
         filtros.apellido,
         filtros.nombre
       );
 
-      // Mapear respuesta del back (Entidades) a DTO visual
       const mapeados = data.map((r: any) => ({
         id: r.id,
-        // Si habitacionesReservadas es null o vacío, manejo de error
         habitacion:
           r.habitacionesReservadas && r.habitacionesReservadas.length > 0
             ? r.habitacionesReservadas[0].numero
@@ -44,7 +43,7 @@ export default function CancelarReservaPage() {
           r.habitacionesReservadas && r.habitacionesReservadas.length > 0
             ? r.habitacionesReservadas[0].tipo
             : "-",
-        fechaInicio: r.fechaIngreso ? r.fechaIngreso.split("T")[0] : "", // Formatear fecha
+        fechaInicio: r.fechaIngreso ? r.fechaIngreso.split("T")[0] : "",
         fechaFin: r.fechaEgreso ? r.fechaEgreso.split("T")[0] : "",
         huespedNombre: r.nombre,
         huespedApellido: r.apellido,
@@ -84,7 +83,6 @@ export default function CancelarReservaPage() {
 
     if (result.isConfirmed) {
       try {
-        // LLAMADA REAL AL BACKEND
         await reservaService.cancelar(reserva.id);
 
         setReservas((prev) => prev.filter((r) => r.id !== reserva.id));
@@ -186,6 +184,13 @@ export default function CancelarReservaPage() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* --- AGREGADO: BOTÓN CANCELAR (VOLVER) A LA IZQUIERDA --- */}
+      <div className="flex justify-start mt-8">
+        <Button variant="secondary" onClick={() => router.push("/")}>
+          Cancelar
+        </Button>
       </div>
     </MainContainer>
   );

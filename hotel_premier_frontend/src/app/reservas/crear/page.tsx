@@ -373,9 +373,9 @@ export default function CrearReservaPage() {
           </div>
         )}
       </div>
-      <div className="flex justify-end mt-8">
+      <div className="flex justify-start mt-8">
         <Button variant="secondary" onClick={() => router.push("/")}>
-          Volver al Menú
+          Cancelar
         </Button>
       </div>
     </MainContainer>

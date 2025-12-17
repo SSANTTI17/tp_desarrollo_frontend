@@ -116,9 +116,9 @@ export default function EstadoHabitacionesPage() {
       <div className="bg-white rounded-lg shadow-sm border border-legacy-inputBorder p-4">
         <Tabs tabs={tabs} />
       </div>
-      <div className="flex justify-end mt-6">
+      <div className="flex justify-start mt-6">
         <Button variant="secondary" onClick={() => window.history.back()}>
-          Volver
+          Cancelar
         </Button>
       </div>
     </MainContainer>
