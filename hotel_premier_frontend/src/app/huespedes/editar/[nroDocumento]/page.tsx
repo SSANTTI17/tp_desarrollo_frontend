@@ -109,10 +109,7 @@ export default function EditarHuespedPage() {
       });
 
       if (result.isConfirmed) {
-        const respuesta = await huespedService.eliminar(
-          huesped.nroDocumento, // CORREGIDO
-          huesped.tipo_documento.toString() // CORREGIDO
-        );
+        const respuesta = await huespedService.eliminar(huesped);
 
         await showSuccess(
           "Eliminado",

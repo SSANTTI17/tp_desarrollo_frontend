@@ -49,9 +49,9 @@ export const huespedService = {
   },
 
   // CU11: Eliminar
-  eliminar: async (nroDocumento: string, tipoDoc: string) => {
+  eliminar: async (huesped: HuespedDTO) => {
     // El back pide un HuespedDTO en el body para eliminar
-    const dto = { nroDocumento, tipo_documento: tipoDoc };
+    const dto = huesped;
     return await apiClient.delete("/huespedes/eliminar", dto);
   },
 };
