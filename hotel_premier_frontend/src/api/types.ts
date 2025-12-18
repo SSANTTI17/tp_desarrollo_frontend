@@ -44,6 +44,13 @@ export interface PersonaFisicaDTO {
   refHuesped?: HuespedDTO;
 }
 
+export interface PersonaJuridicaDTO {
+  razonSocial: string;
+  CUIT: string;
+  telefono: number;
+  direccion: string;
+}
+
 export interface ContenedorAltaHuesped {
   huesped: HuespedDTO;
   personaFisica: PersonaFisicaDTO | null;
@@ -81,7 +88,7 @@ export interface ReservaListadoDTO {
   estado: string;
 }
 
-// --- NUEVOS DTOS PARA FACTURACIÓN (CU07) ---
+// --- FACTURACIÓN ---
 
 export interface OcupanteDTO {
   nombre: string;
@@ -112,6 +119,7 @@ export interface FacturaDTO {
   totalAPagar: number;
   vuelto: number;
   pagado: boolean;
+  nombreResponsable?: string;
   responsablePago?: any;
 }
 
@@ -127,15 +135,19 @@ export interface GenerarFacturaRequest {
   habitacion: { numero: number; tipo: string };
 }
 
+// --- NUEVO: Forma de Pago ---
+export interface FormaDePagoDTO {
+  tarjetaDeCredito?: string | null;
+  tarjetaDeDebito?: string | null;
+  efectivo: boolean;
+  monto: number;
+}
+
 export interface ConfirmarFacturaRequest {
   idEstadia: number;
   factura: any;
   huesped?: HuespedDTO;
-  responsable?: {
-    CUIT: string;
-    razonSocial?: string;
-    direccion?: string;
-    telefono?: number;
-  }; // Coincide con PersonaJuridicaDTO del back
+  responsable?: PersonaJuridicaDTO;
   consumos: ConsumoDTO[];
+  formasPago: FormaDePagoDTO[]; // <--- Agregamos esto
 }

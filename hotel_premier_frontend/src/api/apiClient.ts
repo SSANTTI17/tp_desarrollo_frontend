@@ -1,4 +1,3 @@
-// Asegúrate de que apunte a tu backend Spring Boot
 const API_BASE_URL = "http://localhost:8080/api";
 
 export const apiClient = {
@@ -27,8 +26,15 @@ export const apiClient = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+
     // Manejo especial porque el back a veces devuelve texto plano y a veces JSON
     const text = await response.text();
+
+    // --- CORRECCIÓN CLAVE: Si la respuesta está vacía, devolvemos null ---
+    // Esto permite que el servicio detecte cuando un tercero no existe.
+    if (!text) return null;
+    // --------------------------------------------------------------------
+
     if (!response.ok) {
       // Intentar parsear si el error viene como JSON
       try {
