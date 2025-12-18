@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation"; // Importamos useRouter
+import { useRouter } from "next/navigation";
 import { MainContainer } from "@/components/ui/MainContainer";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -10,7 +10,7 @@ import { reservaService } from "@/api/reservaService";
 import { ReservaListadoDTO } from "@/api/types";
 
 export default function CancelarReservaPage() {
-  const router = useRouter(); // Inicializamos el router
+  const router = useRouter();
   const { showAlert, showSuccess, showError } = useAlert();
 
   const [filtros, setFiltros] = useState({ apellido: "", nombre: "" });
@@ -185,8 +185,6 @@ export default function CancelarReservaPage() {
           </div>
         )}
       </div>
-
-      {/* --- AGREGADO: BOTÓN CANCELAR (VOLVER) A LA IZQUIERDA --- */}
       <div className="flex justify-start mt-8">
         <Button variant="secondary" onClick={() => router.push("/")}>
           Cancelar

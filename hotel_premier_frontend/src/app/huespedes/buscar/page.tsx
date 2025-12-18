@@ -12,7 +12,7 @@ import { useAlert } from "@/hooks/useAlert";
 
 export default function BuscarHuespedPage() {
   const router = useRouter();
-  const { showError } = useAlert();
+  const { showError, showAlert } = useAlert();
 
   const [filtros, setFiltros] = useState({
     nombre: "",
@@ -24,11 +24,15 @@ export default function BuscarHuespedPage() {
   const [huespedes, setHuespedes] = useState<HuespedDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [busquedaRealizada, setBusquedaRealizada] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
 
-  // Helper para validar solo texto (sin números)
+  // Estado para guardar la clave compuesta (Tipo-Numero) ---
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+
+  // Función auxiliar para generar la clave única ---
+  const getUniqueKey = (h: HuespedDTO) =>
+    `${h.tipo_documento}-${h.nroDocumento}`;
+
   const handleTextInput = (field: string, value: string) => {
-    // Regex: Solo permite letras (a-z, A-Z) y espacios
     if (/^[a-zA-Z\s]*$/.test(value)) {
       setFiltros((prev) => ({ ...prev, [field]: value }));
     }
@@ -37,7 +41,7 @@ export default function BuscarHuespedPage() {
   const handleSearch = async () => {
     setLoading(true);
     setBusquedaRealizada(true);
-    setSelectedDoc(null);
+    setSelectedKey(null); // Reseteamos selección al buscar de nuevo
 
     try {
       const resultados = await huespedService.buscar({
@@ -47,6 +51,22 @@ export default function BuscarHuespedPage() {
         tipoDocumento: filtros.tipoDocumento,
       });
       setHuespedes(resultados);
+
+      if (resultados.length === 0) {
+        const result = await showAlert({
+          title: "Sin resultados",
+          text: "No se encontro huesped que coincida con los datos provistos, desea cargar uno?",
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonText: "Dar alta",
+          cancelButtonText: "Cancelar",
+          reverseButtons: true,
+        });
+
+        if (result.isConfirmed) {
+          router.push("/huespedes/alta");
+        }
+      }
     } catch (err) {
       console.error(err);
       showError("Error al buscar huéspedes o no hay conexión.");
@@ -57,17 +77,18 @@ export default function BuscarHuespedPage() {
   };
 
   const handleNext = () => {
-    if (selectedDoc) {
-      // Si hay un huésped seleccionado, vamos a la pantalla de EDICIÓN
-      router.push(`/huespedes/editar/${selectedDoc}`);
+    if (selectedKey) {
+      // Desarmamos la clave para obtener el número real
+      const [tipo, nro] = selectedKey.split("-");
+
+      // Enviamos también el tipo como Query Param para evitar ambigüedad en la edición
+      router.push(`/huespedes/editar/${nro}?tipo=${tipo}`);
     } else {
-      // Si NO hay selección, asumimos que se quiere dar de ALTA uno nuevo
       router.push("/huespedes/alta");
     }
   };
 
   const handleCancel = () => {
-    // Volver al menú principal
     router.push("/");
   };
 
@@ -80,13 +101,13 @@ export default function BuscarHuespedPage() {
             label="Nombres:"
             placeholder="Ingrese sus nombres"
             value={filtros.nombre}
-            onChange={(e) => handleTextInput("nombre", e.target.value)} // Validación aplicada
+            onChange={(e) => handleTextInput("nombre", e.target.value)}
           />
           <Input
             label="Apellido:"
             placeholder="Ingrese su apellido"
             value={filtros.apellido}
-            onChange={(e) => handleTextInput("apellido", e.target.value)} // Validación aplicada
+            onChange={(e) => handleTextInput("apellido", e.target.value)}
           />
           <Select
             label="Tipo de documento:"
@@ -95,7 +116,6 @@ export default function BuscarHuespedPage() {
               setFiltros({ ...filtros, tipoDocumento: e.target.value })
             }
             options={[
-              // Lista completa según TipoDoc en types.ts
               { label: "DNI", value: TipoDoc.DNI },
               { label: "Libreta Cívica", value: TipoDoc.LC },
               { label: "Libreta Enrolamiento", value: TipoDoc.LE },
@@ -125,7 +145,7 @@ export default function BuscarHuespedPage() {
               });
               setHuespedes([]);
               setBusquedaRealizada(false);
-              setSelectedDoc(null);
+              setSelectedKey(null);
             }}
           >
             Limpiar
@@ -167,27 +187,33 @@ export default function BuscarHuespedPage() {
                   </td>
                 </tr>
               ) : huespedes.length > 0 ? (
-                huespedes.map((h) => (
-                  <tr
-                    key={h.nroDocumento}
-                    onClick={() => setSelectedDoc(h.nroDocumento)}
-                    className={`cursor-pointer transition-colors ${
-                      selectedDoc === h.nroDocumento
-                        ? "bg-blue-100 text-blue-900 font-medium"
-                        : "hover:bg-blue-50"
-                    }`}
-                  >
-                    <td className="px-6 py-3 border-r border-gray-100">
-                      {h.nombre}
-                    </td>
-                    <td className="px-6 py-3 border-r border-gray-100">
-                      {h.apellido}
-                    </td>
-                    <td className="px-6 py-3">
-                      {h.tipo_documento} {h.nroDocumento}
-                    </td>
-                  </tr>
-                ))
+                huespedes.map((h) => {
+                  // --- CAMBIO 3: Usar la clave compuesta ---
+                  const uniqueKey = getUniqueKey(h);
+                  const isSelected = selectedKey === uniqueKey;
+
+                  return (
+                    <tr
+                      key={uniqueKey} // Key única real
+                      onClick={() => setSelectedKey(uniqueKey)}
+                      className={`cursor-pointer transition-colors ${
+                        isSelected
+                          ? "bg-blue-100 text-blue-900 font-medium"
+                          : "hover:bg-blue-50"
+                      }`}
+                    >
+                      <td className="px-6 py-3 border-r border-gray-100">
+                        {h.nombre}
+                      </td>
+                      <td className="px-6 py-3 border-r border-gray-100">
+                        {h.apellido}
+                      </td>
+                      <td className="px-6 py-3">
+                        {h.tipo_documento} {h.nroDocumento}
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td

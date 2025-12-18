@@ -20,32 +20,87 @@ export default function CrearReservaPage() {
   const router = useRouter();
   const { showSuccess, showError, showAlert } = useAlert();
 
+  // Estado inicial "" actuará como "Todas las habitaciones" gracias al placeholder
   const [tipoHabitacion, setTipoHabitacion] = useState<TipoHabitacion | "">("");
 
-  // Fechas
-  const todayStr = new Date().toISOString().split("T")[0];
-  const nextWeekStr = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split("T")[0];
+  const TIPO_HABITACION_LABELS: Record<string, string> = {
+    [TipoHabitacion.IE]: "Individual estándar",
+    [TipoHabitacion.DE]: "Doble estándar",
+    [TipoHabitacion.DS]: "Doble superior",
+    [TipoHabitacion.SFP]: "Superior Family Plan",
+    [TipoHabitacion.SD]: "Suite doble",
+  };
 
   const [fechas, setFechas] = useState({
-    desde: todayStr,
-    hasta: nextWeekStr,
+    desde: "",
+    hasta: "",
   });
 
-  const [habitaciones, setHabitaciones] = useState<HabitacionDTO[]>([]);
+  const [allHabitaciones, setAllHabitaciones] = useState<HabitacionDTO[]>([]);
   const [pendientes, setPendientes] = useState<GridSelection[]>([]);
   const [loading, setLoading] = useState(false);
   const [busquedaRealizada, setBusquedaRealizada] = useState(false);
 
-  const formatFecha = (f: string) => f.split("-").reverse().join("/");
-
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFechas({ ...fechas, [e.target.name]: e.target.value });
+  // --- HELPERS DE FECHA ---
+  const parseDateSeguro = (fechaStr: string) => {
+    if (!fechaStr) return null;
+    let year, month, day;
+    if (fechaStr.includes("/")) {
+      [day, month, year] = fechaStr.split("/").map(Number);
+    } else {
+      [year, month, day] = fechaStr.split("-").map(Number);
+    }
+    return new Date(year, month - 1, day, 12, 0, 0);
   };
 
+  const formatFechaDetallada = (fechaStr: string) => {
+    const date = parseDateSeguro(fechaStr);
+    if (!date || isNaN(date.getTime())) return fechaStr;
+    const nombreDia = new Intl.DateTimeFormat("es-AR", {
+      weekday: "long",
+    }).format(date);
+    const nombreDiaCap = nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1);
+    return `${nombreDiaCap}, ${date.toLocaleDateString("es-AR")}`;
+  };
+
+  // --- LOGICA 1: CAMBIO DE FECHAS PROTEGIDO ---
+  const handleDateChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    const field = e.target.name;
+
+    if (pendientes.length > 0) {
+      const result = await showAlert({
+        title: "¡Atención!",
+        text: "Si cambias las fechas, se perderán todas las selecciones actuales. ¿Deseas continuar?",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, cambiar y limpiar",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#ef4444",
+      });
+
+      if (!result.isConfirmed) return;
+
+      setPendientes([]);
+      setAllHabitaciones([]);
+      setBusquedaRealizada(false);
+    }
+
+    setFechas((prev) => ({ ...prev, [field]: newValue }));
+    setBusquedaRealizada(false);
+    setAllHabitaciones([]);
+  };
+
+  // --- LOGICA 2: CAMBIO DE TIPO DE HABITACION (NAVEGACION) ---
+  const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setTipoHabitacion(e.target.value as TipoHabitacion);
+    // No limpiamos pendientes para permitir selección múltiple entre tipos
+  };
+
+  // --- BUSQUEDA ---
   const handleSearch = async () => {
-    if (!tipoHabitacion) return;
+    // CAMBIO: Ya no validamos if (!tipoHabitacion) return; para permitir búsqueda de "Todas"
+
     if (!fechas.desde || !fechas.hasta) {
       showError("Debe seleccionar ambas fechas.");
       return;
@@ -55,35 +110,28 @@ export default function CrearReservaPage() {
       return;
     }
 
-    setHabitaciones([]);
-    setPendientes([]);
     setLoading(true);
-    setBusquedaRealizada(true);
 
     try {
-      const todasLasHabitaciones = await habitacionService.getEstado(
+      const data = await habitacionService.getEstado(
         fechas.desde,
         fechas.hasta
       );
-
-      const habitacionesFiltradas = todasLasHabitaciones.filter(
-        (h) => h.tipo === tipoHabitacion
-      );
-
-      const hayDisponibilidad = habitacionesFiltradas.some((h) =>
-        h.estadosPorDia.some((e) => e === EstadoHabitacion.DISPONIBLE)
-      );
-
-      if (hayDisponibilidad) {
-        setHabitaciones(habitacionesFiltradas);
-      }
+      setAllHabitaciones(data);
+      setBusquedaRealizada(true);
     } catch (error: any) {
       console.error(error);
-      showError("Error al obtener las habitaciones de la base de datos.");
+      showError("Error al obtener disponibilidad.");
+      setAllHabitaciones([]);
     } finally {
       setLoading(false);
     }
   };
+
+  // --- FILTRO VISUAL DINAMICO ---
+  const habitacionesVisuales = allHabitaciones.filter(
+    (h) => !tipoHabitacion || h.tipo === tipoHabitacion
+  );
 
   const handleSelectionComplete = (nuevaSeleccion: GridSelection) => {
     const colision = pendientes.find(
@@ -102,25 +150,39 @@ export default function CrearReservaPage() {
     setPendientes([...pendientes, nuevaSeleccion]);
   };
 
+  const handleSelectionRemove = (seleccionParaBorrar: GridSelection) => {
+    setPendientes((prev) =>
+      prev.filter(
+        (p) =>
+          p.habitacion !== seleccionParaBorrar.habitacion ||
+          p.startIndex !== seleccionParaBorrar.startIndex
+      )
+    );
+  };
+
   const removeSelectionByIndex = (index: number) => {
     const nuevas = [...pendientes];
     nuevas.splice(index, 1);
     setPendientes(nuevas);
   };
 
-  const handleSelectionRemove = (s: GridSelection) => {};
   const handleSelectionError = (m: string) => showError(m);
 
+  // --- CONFIRMACION ---
   const handleConfirmarTodo = async () => {
     if (pendientes.length === 0) return;
 
     const listaHtml = pendientes
-      .map(
-        (p) =>
-          `<li class="mb-1"><b>Hab ${p.habitacion}:</b> del ${formatFecha(
-            p.fechas[0]
-          )} al ${formatFecha(p.fechas[p.fechas.length - 1])}</li>`
-      )
+      .map((p) => {
+        const hab = allHabitaciones.find((h) => h.numero === p.habitacion);
+        const tipoLabel = hab
+          ? TIPO_HABITACION_LABELS[hab.tipo] || hab.tipo
+          : "Desconocido";
+        return `<li class="mb-1 text-left">
+                  <b>Hab ${p.habitacion} (${tipoLabel}):</b><br/> 
+                  Del ${p.fechas[0]} al ${p.fechas[p.fechas.length - 1]}
+                </li>`;
+      })
       .join("");
 
     const result = await showAlert({
@@ -128,13 +190,15 @@ export default function CrearReservaPage() {
       html: `
         <div class="text-left">
             <p class="mb-3">Estás por reservar las siguientes habitaciones:</p>
-            <ul class="list-disc pl-5 text-sm mb-4 bg-gray-50 p-2 rounded border">${listaHtml}</ul>
+            <ul class="list-disc pl-5 text-sm mb-4 bg-gray-50 p-2 rounded border max-h-40 overflow-y-auto">
+              ${listaHtml}
+            </ul>
             <p class="font-bold text-right">Total: ${pendientes.length} habitaciones</p>
         </div>
       `,
       showCancelButton: true,
-      confirmButtonText: "Sí, continuar",
-      cancelButtonText: "Cancelar",
+      confirmButtonText: "Aceptar",
+      cancelButtonText: "Rechazar",
     });
 
     if (result.isConfirmed) {
@@ -177,16 +241,16 @@ export default function CrearReservaPage() {
       if (datos) {
         setLoading(true);
         try {
-          // PROCESO DE GUARDADO:
-          // Iteramos sobre las selecciones y enviamos una petición por cada selección
-
           for (const p of pendientes) {
-            // --- CORRECCIÓN IMPORTANTE ---
-            // Enviamos los datos "planos" para que el backend Java use setNumero() y setTipo()
+            const habOriginal = allHabitaciones.find(
+              (h) => h.numero === p.habitacion
+            );
+            if (!habOriginal) continue;
+
             const habitacionPayload = {
               numero: p.habitacion,
-              tipo: tipoHabitacion,
-              costoNoche: 0, // Valor dummy
+              tipo: habOriginal.tipo,
+              costoNoche: habOriginal.costoNoche,
             };
 
             const bodyRequest = {
@@ -228,6 +292,7 @@ export default function CrearReservaPage() {
             busquedaRealizada ? "lg:col-span-3" : "lg:col-span-1"
           } space-y-6 transition-all`}
         >
+          {/* Formulario */}
           <div className="bg-white p-6 rounded-lg border border-legacy-inputBorder shadow-sm flex flex-col gap-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <DateInput
@@ -248,24 +313,34 @@ export default function CrearReservaPage() {
                 <Select
                   label="Tipo de habitación:"
                   value={tipoHabitacion}
-                  onChange={(e) =>
-                    setTipoHabitacion(e.target.value as TipoHabitacion)
-                  }
+                  onChange={handleTypeChange}
+                  placeholder="Todas las Habitaciones"
                   options={[
-                    { label: "Individual estándar", value: TipoHabitacion.IE },
-                    { label: "Doble estándar", value: TipoHabitacion.DE },
-                    { label: "Doble superior", value: TipoHabitacion.DS },
                     {
-                      label: "Superior Family Plan",
+                      label: TIPO_HABITACION_LABELS[TipoHabitacion.IE],
+                      value: TipoHabitacion.IE,
+                    },
+                    {
+                      label: TIPO_HABITACION_LABELS[TipoHabitacion.DE],
+                      value: TipoHabitacion.DE,
+                    },
+                    {
+                      label: TIPO_HABITACION_LABELS[TipoHabitacion.DS],
+                      value: TipoHabitacion.DS,
+                    },
+                    {
+                      label: TIPO_HABITACION_LABELS[TipoHabitacion.SFP],
                       value: TipoHabitacion.SFP,
                     },
-                    { label: "Suite doble", value: TipoHabitacion.SD },
+                    {
+                      label: TIPO_HABITACION_LABELS[TipoHabitacion.SD],
+                      value: TipoHabitacion.SD,
+                    },
                   ]}
                 />
               </div>
               <Button
                 onClick={handleSearch}
-                disabled={!tipoHabitacion}
                 isLoading={loading}
                 className="w-full md:w-auto px-8 whitespace-nowrap"
               >
@@ -274,20 +349,29 @@ export default function CrearReservaPage() {
             </div>
           </div>
 
+          {/* Grilla de Resultados */}
           {busquedaRealizada && (
             <div className="bg-white p-4 rounded-lg border border-legacy-inputBorder shadow-sm animate-in fade-in">
-              <div className="mb-4">
+              <div className="mb-4 flex justify-between items-center">
                 <h3 className="font-semibold text-legacy-text">
                   Resultados de búsqueda
                 </h3>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  Mostrando:{" "}
+                  {tipoHabitacion
+                    ? TIPO_HABITACION_LABELS[tipoHabitacion]
+                    : "Todas"}
+                </span>
               </div>
-              {habitaciones.length > 0 ? (
+
+              {habitacionesVisuales.length > 0 ? (
                 <>
                   <p className="text-xs text-gray-500 mb-2">
-                    Seleccione rangos disponibles (Verde).
+                    Seleccione rangos disponibles (Verde). Haga clic en una
+                    selección azul para quitarla.
                   </p>
                   <AvailabilityGrid
-                    habitaciones={habitaciones}
+                    habitaciones={habitacionesVisuales}
                     fechaInicio={fechas.desde}
                     dias={
                       Math.floor(
@@ -306,11 +390,8 @@ export default function CrearReservaPage() {
               ) : (
                 <div className="p-10 text-center text-gray-500 border border-dashed border-gray-300 rounded-lg bg-gray-50">
                   <p className="text-lg">
-                    No existen habitaciones del tipo{" "}
-                    <span className="font-bold text-legacy-text">
-                      {tipoHabitacion}
-                    </span>{" "}
-                    para el rango de fechas seleccionado.
+                    No existen habitaciones del tipo seleccionado para el rango
+                    de fechas.
                   </p>
                 </div>
               )}
@@ -318,7 +399,8 @@ export default function CrearReservaPage() {
           )}
         </div>
 
-        {busquedaRealizada && habitaciones.length > 0 && (
+        {/* Panel Lateral: Tu Selección */}
+        {busquedaRealizada && (
           <div className="lg:col-span-1 bg-white p-4 rounded-lg border border-legacy-inputBorder shadow-sm h-fit sticky top-4 animate-in slide-in-from-right-4 fade-in duration-500">
             <div className="flex justify-between items-center mb-4 border-b pb-2 border-legacy-inputBorder">
               <h3 className="font-bold text-legacy-text">Tu Selección</h3>
@@ -326,42 +408,60 @@ export default function CrearReservaPage() {
                 {pendientes.length}
               </span>
             </div>
+
             {pendientes.length === 0 ? (
               <div className="text-center py-8 text-gray-400">
                 <p className="text-sm italic">El carrito está vacío.</p>
               </div>
             ) : (
               <ul className="space-y-3 mb-6 max-h-[400px] overflow-y-auto pr-1">
-                {pendientes.map((p, i) => (
-                  <li
-                    key={i}
-                    className="text-sm bg-blue-50 p-3 rounded border border-blue-100 relative group shadow-sm hover:shadow-md transition-all"
-                  >
-                    <div className="flex justify-between items-start">
-                      <span className="font-bold text-legacy-primary">
-                        Hab {p.habitacion}
-                      </span>
-                      <button
-                        onClick={() => removeSelectionByIndex(i)}
-                        className="text-gray-400 hover:text-red-500 transition-colors p-0.5"
-                        title="Quitar"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    <div className="text-gray-600 text-xs mt-1 flex flex-col">
-                      <span>
-                        <b>Desde:</b> {formatFecha(p.fechas[0])}
-                      </span>
-                      <span>
-                        <b>Hasta:</b>{" "}
-                        {formatFecha(p.fechas[p.fechas.length - 1])}
-                      </span>
-                    </div>
-                  </li>
-                ))}
+                {pendientes.map((p, i) => {
+                  // Buscamos el tipo real en el array global
+                  const hab = allHabitaciones.find(
+                    (h) => h.numero === p.habitacion
+                  );
+                  const tipoTexto = hab
+                    ? TIPO_HABITACION_LABELS[hab.tipo] || hab.tipo
+                    : "Cargando...";
+
+                  return (
+                    <li
+                      key={i}
+                      className="text-sm bg-blue-50 p-3 rounded border border-blue-100 relative group shadow-sm hover:shadow-md transition-all"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="font-bold text-lg text-legacy-primary">
+                          Hab {p.habitacion}
+                        </span>
+                        <button
+                          onClick={() => removeSelectionByIndex(i)}
+                          className="text-gray-400 hover:text-red-500 transition-colors p-0.5"
+                          title="Quitar"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      <div className="text-gray-700 text-xs space-y-1">
+                        <div className="flex items-center gap-1 font-semibold text-gray-900">
+                          ✓ {tipoTexto}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          ✓ <span className="font-semibold">Ingreso:</span>{" "}
+                          {formatFechaDetallada(p.fechas[0])}, 12:00hs.
+                        </div>
+                        <div className="flex items-center gap-1">
+                          ✓ <span className="font-semibold">Egreso:</span>{" "}
+                          {formatFechaDetallada(p.fechas[p.fechas.length - 1])},
+                          10:00hs.
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
+
             <Button
               onClick={handleConfirmarTodo}
               disabled={pendientes.length === 0}
@@ -373,6 +473,7 @@ export default function CrearReservaPage() {
           </div>
         )}
       </div>
+
       <div className="flex justify-start mt-8">
         <Button variant="secondary" onClick={() => router.push("/")}>
           Cancelar

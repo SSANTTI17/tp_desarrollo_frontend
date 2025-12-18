@@ -35,11 +35,6 @@ export default function EstadoHabitacionesPage() {
       setLoading(false);
     }
   };
-  /*
-  useEffect(() => {
-    handleSearch();
-  }, []);
-  */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFechas({ ...fechas, [e.target.name]: e.target.value });
   };
@@ -63,7 +58,7 @@ export default function EstadoHabitacionesPage() {
     );
   };
 
-  // Pestañas (Igual que antes)
+  // Pestañas
   const tabs = [
     {
       id: "ie",
