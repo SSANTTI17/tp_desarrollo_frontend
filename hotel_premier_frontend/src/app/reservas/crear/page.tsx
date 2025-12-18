@@ -20,7 +20,6 @@ export default function CrearReservaPage() {
   const router = useRouter();
   const { showSuccess, showError, showAlert } = useAlert();
 
-  // Estado inicial "" actuará como "Todas las habitaciones" gracias al placeholder
   const [tipoHabitacion, setTipoHabitacion] = useState<TipoHabitacion | "">("");
 
   const TIPO_HABITACION_LABELS: Record<string, string> = {
@@ -63,7 +62,6 @@ export default function CrearReservaPage() {
     return `${nombreDiaCap}, ${date.toLocaleDateString("es-AR")}`;
   };
 
-  // --- LOGICA 1: CAMBIO DE FECHAS PROTEGIDO ---
   const handleDateChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     const field = e.target.name;
@@ -91,16 +89,11 @@ export default function CrearReservaPage() {
     setAllHabitaciones([]);
   };
 
-  // --- LOGICA 2: CAMBIO DE TIPO DE HABITACION (NAVEGACION) ---
   const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setTipoHabitacion(e.target.value as TipoHabitacion);
-    // No limpiamos pendientes para permitir selección múltiple entre tipos
   };
 
-  // --- BUSQUEDA ---
   const handleSearch = async () => {
-    // CAMBIO: Ya no validamos if (!tipoHabitacion) return; para permitir búsqueda de "Todas"
-
     if (!fechas.desde || !fechas.hasta) {
       showError("Debe seleccionar ambas fechas.");
       return;
@@ -128,7 +121,6 @@ export default function CrearReservaPage() {
     }
   };
 
-  // --- FILTRO VISUAL DINAMICO ---
   const habitacionesVisuales = allHabitaciones.filter(
     (h) => !tipoHabitacion || h.tipo === tipoHabitacion
   );
@@ -168,7 +160,6 @@ export default function CrearReservaPage() {
 
   const handleSelectionError = (m: string) => showError(m);
 
-  // --- CONFIRMACION ---
   const handleConfirmarTodo = async () => {
     if (pendientes.length === 0) return;
 
@@ -208,10 +199,8 @@ export default function CrearReservaPage() {
             <div class="flex flex-col gap-3 text-left">
               <label>Apellido <span class="text-red-500">*</span></label>
               <input id="swal-apellido" class="swal2-input m-0" placeholder="Ej: Perez">
-              
               <label>Nombre <span class="text-red-500">*</span></label>
               <input id="swal-nombre" class="swal2-input m-0" placeholder="Ej: Juan">
-              
               <label>Teléfono <span class="text-red-500">*</span></label>
               <input id="swal-tel" class="swal2-input m-0" placeholder="Ej: 341...">
             </div>
@@ -257,9 +246,10 @@ export default function CrearReservaPage() {
               nombre: datos.nombre,
               apellido: datos.apellido,
               telefono: datos.telefono,
-              fechaInicio: p.fechas[0],
-              fechaFin: p.fechas[p.fechas.length - 1],
-              habitaciones: [habitacionPayload],
+              // CORRECCIÓN 1: Nombres de claves coinciden con Backend DTO
+              fechaIngreso: p.fechas[0],
+              fechaEgreso: p.fechas[p.fechas.length - 1],
+              habitacionesReservadas: [habitacionPayload],
             };
 
             await apiClient.post(`/reservas/crear`, bodyRequest);
@@ -416,7 +406,6 @@ export default function CrearReservaPage() {
             ) : (
               <ul className="space-y-3 mb-6 max-h-[400px] overflow-y-auto pr-1">
                 {pendientes.map((p, i) => {
-                  // Buscamos el tipo real en el array global
                   const hab = allHabitaciones.find(
                     (h) => h.numero === p.habitacion
                   );
